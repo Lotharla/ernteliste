@@ -1,0 +1,62 @@
+Spinat
+Mangold
+Bete
+NZL Spinat
+Malabarspinat
+Salat
+Endivien
+Feldsalat
+Postelein
+Petersilie
+Dill
+Schnittlauch
+Liebstöckl
+Winterheckzwiebel & Schnittknoblauch
+Basilikum
+Rübstiel
+Radies
+Rettich
+Rübchen
+Rauke
+Asiasalat
+Kohlrabi
+Brokkoli
+Blumenkohl
+Grünkohl
+Palmkohl
+Wirsing
+Rosenkohl
+Spitzkohl
+Chinakohl
+Pakchoi
+Dicke Bohnen
+Buschbohnen
+Stangenbohnen
+Spaghettibohnen
+Zuckererbsen
+Zuckermais
+Lauchzwiebel
+Frühjahrzwiebel
+Winterzwiebel
+Knoblauch
+Porree
+Kürbis Hokkaido
+Kürbis Butternut
+Kürbis Sweet Dumpling
+Kürbis sonstige
+Salatgurke
+Freilandgurke
+Zucchini
+Melone
+Tomaten
+Paprika
+Aubergine
+Möhre
+Pastinake
+Schwarzwurzel
+Petersilienwurzel
+Knollensellerie
+Staudensellerie
+Fenchel
+Süsskartoffel
+Rhabarber
