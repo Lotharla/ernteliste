@@ -1,13 +1,13 @@
 import 'package:ernteliste/src/app_constant.dart';
+import 'package:ernteliste/src/table/tables_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
-import 'kw_feature/kw_model.dart';
 import 'ertrag_feature/ertrag_form.dart';
-import 'kw_feature/kw_list_view.dart';
-import 'ertrag_feature/kw_ertrag_view.dart';
+import 'kw_feature/kw_view.dart';
+import 'ertrag_feature/ertrag_view.dart';
 import 'settings/settings_controller.dart';
 import 'settings/settings_view.dart';
 import 'persistence/persistence_provider.dart';
@@ -78,14 +78,15 @@ class MyApp extends StatelessWidget {
                   switch (routeSettings.name) {
                     case SettingsView.routeName:
                       return SettingsView(controller: settingsController);
+                    case TablesPage.routeName:
+                      return const TablesPage();
                     case ErtragForm.routeName:
                       return const ErtragForm();
                     case KwErtragView.routeName:
                       return const KwErtragView(title: 'Kw');
                     case KwListView.routeName:
                     default:
-                      var kwItems = KwModel.kwItems();
-                      return KwListView(kwItems);
+                      return const KwListView();
                   }
                 },
               );

@@ -50,7 +50,7 @@ class SettingsController with ChangeNotifier {
     await _settingsService.updateThemeMode(newThemeMode);
   }
   Future<void> updateYear(DateTime newYear) async {
-    KwModel.refTime = refDay(newYear.year);
+    KwModel.refTime.value = refDay(newYear.year);
     notifyListeners();
   }
 }

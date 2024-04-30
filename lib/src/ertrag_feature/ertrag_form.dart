@@ -1,5 +1,6 @@
 // ignore_for_file: curly_braces_in_flow_control_structures
 
+import 'package:ernteliste/src/misc.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:ernteliste/src/app_constant.dart';
@@ -7,6 +8,8 @@ import 'package:server/tables.dart';
 import 'package:provider/provider.dart';
 import 'package:ernteliste/src/persistence/persistence_provider.dart';
 import 'package:server/utils.dart';
+
+import '../persistence/persistor.dart';
 
 class ErtragForm extends StatefulWidget {
   const ErtragForm({super.key, this.title});
@@ -24,113 +27,127 @@ class _ErtragFormState extends State<ErtragForm> {
       Provider.of<PersistenceProvider>(AppConstant.globalNavigatorKey.currentContext!);
   final _formKey = GlobalKey<FormState>();
   Map<String,TextEditingController> controllers = {};
-  late FocusNode focusNode;
-  late Future<List> einheiten, kulturen, bemerkungen;
+  FocusNode? focusNode;
+  late Map<String,Future<List>> lists;
 
   @override
   void initState() {
     super.initState();
-    focusNode = FocusNode();
+    // focusNode = FocusNode();
     for(String col in columns[tableErtrag]!) controllers[col] = TextEditingController();
-    einheiten = persistenceProvider.fetch(tableEinheiten);
-    kulturen = persistenceProvider.fetch(tableKulturen);
-    bemerkungen = persistenceProvider.fetch(columnBemerkungen);
+    lists = persistenceProvider.multiFetch();
   }
   @override
   void dispose() {
-    focusNode.dispose();
+    // focusNode.dispose();
     for(String col in columns[tableErtrag]!) controllers[col]!.dispose();
     super.dispose();
   }
-  void setFocus() {
-    focusNode.requestFocus();
-  }
   Map args = {};
-  bool get ertragNeW => args['record'][columnId] == null;
+  bool get ertragNew => args['record'][columnId] == null;
+  get kw => kwString(args['record'][columnKw] ?? weekOfYear());
   String ertragTitle() {
-    var kw = kwString(args['record'][columnKw] ?? weekOfYear());
-    if (ertragNeW) {
+    if (ertragNew) {
       return 'Neuer Ertrag in $kw';
     } else {
       return 'Ertrag in $kw bearbeiten';
     }
   }
-
+  Future<void> finishForm(BuildContext context) async {
+    await Persistor.multiClose();
+    if (!context.mounted) {
+      return;
+    }
+    if (_formKey.currentState!.validate()) {
+      bool confirmed = true;
+      if (ertragNew) {
+        confirmed = await confirmation(context, cause: Cause.add, singular: true) == true;
+      }
+      if (!ertragNew || confirmed) {
+        for(String col in columns[tableErtrag]!) {
+          args['record'][col] = col == columnMenge
+            ? mengeFormat.parse(controllers[col]!.text) 
+            : controllers[col]!.text;
+        }
+        await persistenceProvider.upsert(args['record']);
+        // args['updater']();
+      }
+    }
+  }
+  void setFocus() {
+    focusNode?.requestFocus();
+  }
   @override
   Widget build(BuildContext context) {
     if (args.isEmpty && widget.title == null) {
       args = (ModalRoute.of(context)!.settings.arguments ?? args) as Map;
       for(String col in columns[tableErtrag]!) {
-        var val = args['record'][col] ?? (col == 'Menge' ? '0' : '');
-        controllers[col]!.text = val.toString();
+        var val = args['record'][col] ?? (col == columnMenge? 0 : '');
+        controllers[col]!.text = col == columnMenge? mengeFormat.format(val) : val.toString();
       }
-      setFocus();
     }
     return Consumer<PersistenceProvider>(
       builder: (context, provider, _) {
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(widget.title ?? ertragTitle()),
-            actions: [
-              IconButton(
-                onPressed: () async {
-                  if (_formKey.currentState!.validate()) {
-                    final navi = Navigator.of(context);
-                    for(String col in columns[tableErtrag]!) args['record'][col] = controllers[col]!.text;
-                    await persistenceProvider.insertOrUpdate(args['record'], kw: args['record'][columnKw]);
-                    // args['updater']();
-                    navi.pop(true);
-                  }
-                }, 
-                tooltip: 'Ertrag abschließen',
-                icon: const Icon(Icons.agriculture),
+        return PopScope(
+          canPop: false,
+          onPopInvoked: (bool didPop) {
+            if (didPop) {
+              return;
+            }
+            finishForm(context);
+            Navigator.pop(context);
+          },
+          child: Scaffold(
+            appBar: AppBar(
+              title: Text(widget.title ?? ertragTitle()),
+            ),
+            body: Form(
+              key: _formKey,
+              child: ListView(
+                children: <Widget>[
+                  FutureListComposite(
+                    name: columnKultur,
+                    list: lists['kulturen']!, 
+                    controller: controllers[columnKultur]!,
+                    focusNode: focusNode,
+                  ),
+                  FormTextField(
+                    columnSatz,
+                    controllers[columnSatz]!,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp('[1-9]')),
+                    ],
+                  ),
+                  FormTextField(
+                    columnMenge,
+                    controllers[columnMenge]!,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp('[0-9.,]')),
+                    ],
+                  ),
+                  FormTextField(
+                    columnEinheit,
+                    controllers[columnEinheit]!,
+                  ),
+                  FutureListComposite(
+                    name: columnEinheit,
+                    list: lists['einheiten']!, 
+                    controller: controllers[columnEinheit]!
+                  ),
+                  FutureListComposite(
+                    name: columnBemerkungen,
+                    list: lists['bemerkungen']!, 
+                    controller: controllers[columnBemerkungen]!
+                  ),
+                  FormTextField(
+                    columnName,
+                    controllers[columnName]!,
+                    readOnly: !persistenceProvider.userIsAdmin()
+                  ),
+                ],
               ),
-              // IconButton(
-              //   onPressed: () async {
-              //     Navigator.pop(context, true);
-              //   }, 
-              //   icon: const Icon(Icons.access_alarm),
-              // ),
-            ],
-          ),
-          body: Form(
-            key: _formKey,
-            child: ListView(
-              children: <Widget>[
-                ErtragTextField(
-                  columnMenge,
-                  controllers[columns[tableErtrag]![2]]!,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp('[0-9.,]')),
-                  ],
-                  focusNode: focusNode,
-                ),
-                ErtragTextField(
-                  columnEinheit,
-                  controllers[columns[tableErtrag]![3]]!,
-                ),
-                FutureList(
-                  name: columnEinheit,
-                  list: einheiten, 
-                  controller: controllers[columns[tableErtrag]![3]]!
-                ),
-                FutureList(
-                  name: columnKultur,
-                  list: kulturen, 
-                  controller: controllers[columns[tableErtrag]![1]]!
-                ),
-                FutureList(
-                  name: columnBemerkungen,
-                  list: bemerkungen, 
-                  controller: controllers[columns[tableErtrag]![4]]!
-                ),
-                ErtragTextField(
-                  columnName,
-                  controllers[columns[tableErtrag]![5]]!,
-                  readOnly: !persistenceProvider.userIsAdmin()
-                ),
-              ],
             ),
           ),
         );
@@ -138,7 +155,7 @@ class _ErtragFormState extends State<ErtragForm> {
     );
   }
 }
-class ErtragTextField extends StatelessWidget {
+class FormTextField extends StatelessWidget {
   final String label;
   final TextEditingController controller;
   final TextInputType? keyboardType;
@@ -149,15 +166,17 @@ class ErtragTextField extends StatelessWidget {
   final Function(String)? onFieldSubmitted;
   final String? initialValue;
   final bool readOnly;
-  const ErtragTextField(this.label, this.controller, {
+  final String? Function(String?)? validator;
+  const FormTextField(this.label, this.controller, {
     this.keyboardType, 
     this.inputFormatters,
     this.focusNode,
-    this.maxLines,
+    this.maxLines = 1,
     this.onChanged,
     this.onFieldSubmitted,
     this.initialValue,
     this.readOnly = false,
+    this.validator,
     super.key
   });
   @override
@@ -178,20 +197,23 @@ class ErtragTextField extends StatelessWidget {
         onFieldSubmitted: onFieldSubmitted,
         initialValue: initialValue,
         readOnly: readOnly,
+        validator: validator,
       ),
     );
   }
 }
-class FutureList extends StatelessWidget {
-  const FutureList({
+class FutureListComposite extends StatelessWidget {
+  const FutureListComposite({
     super.key,
     required this.name,
     required this.list,
-    required this.controller,
+    required this.controller, 
+    this.focusNode,
   });
   final String name;
   final Future<List> list;
   final TextEditingController controller;
+  final FocusNode? focusNode;
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List>(
@@ -213,12 +235,16 @@ class FutureList extends StatelessWidget {
               case columnEinheit:
                 return SelectableButtons(snapshot.data!, controller);
               case columnKultur:
-                return Completer(name, snapshot.data!.map((e) => e.toString()).toList(), controller);
+                return Completer(name, 
+                  snapshot.data!.map((e) => e.toString()).toList(), 
+                  controller,
+                  focusNode: focusNode,
+                );
               case columnBemerkungen:
               default:
                 return Padding(
                   padding: const EdgeInsets.all(0.0),
-                  child: DropList(name: name, list: snapshot.data, controller: controller),
+                  child: PopupListComposite(label: name, list: snapshot.data ?? [], controller: controller),
                 );
             }
           } else {
@@ -231,30 +257,41 @@ class FutureList extends StatelessWidget {
     );
   }
 }
-class DropList extends StatelessWidget {
-  final String name;
-  final Iterable? list;
+class PopupListComposite extends StatelessWidget {
+  final String label;
+  final Iterable list;
   final TextEditingController controller;
-  const DropList({super.key, required this.name, this.list, required this.controller});
+  final String separator;
+  final FocusNode? focusNode;
+  final String? Function(String?)? validator;
+  const PopupListComposite({super.key, 
+    required this.label, required this.list, required this.controller,
+    this.separator = '',
+    this.focusNode, this.validator,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: <Widget>[
         Expanded(
-          child: ErtragTextField(
-            name, controller,
+          child: FormTextField(
+            label, controller,
             keyboardType: TextInputType.multiline,
             maxLines: null,
+            focusNode: focusNode,
+            validator: validator,
           ),
         ),
         PopupMenuButton<String>(
-          icon: const Icon(Icons.arrow_drop_down),
+          // icon: const Icon(Icons.arrow_drop_down),
           onSelected: (String value) {
-            controller.text = controller.text.isEmpty ? value : '${controller.text}\n$value';
+            controller.text = controller.text.isEmpty 
+              ? value 
+              : '${controller.text}\n$separator$value';
           },
           itemBuilder: (BuildContext context) {
-            return list!
+            return list
               .map((e) => e.toString())
               .map<PopupMenuItem<String>>((String value) {
                 return PopupMenuItem(value: value, child: Text(value));
@@ -270,7 +307,8 @@ class Completer extends StatefulWidget {
   final String name;
   final List<String> data;
   final TextEditingController controller;
-  const Completer(this.name, this.data, this.controller, {super.key});
+  final FocusNode? focusNode;
+  const Completer(this.name, this.data, this.controller, {this.focusNode, super.key});
   @override
   State<Completer> createState() => _CompleterState();
 }
@@ -296,7 +334,10 @@ class _CompleterState extends State<Completer> {
         FocusNode fieldFocusNode,
         VoidCallback onFieldSubmitted) 
       {
-        return ErtragTextField(
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          fieldFocusNode.requestFocus();
+        });
+        return FormTextField(
           widget.name,
           fieldTextEditingController,
           focusNode: fieldFocusNode,

@@ -7,10 +7,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:server/tables.dart';
 
-import 'table_row_dialog.dart';
+import 'table_dialogs.dart';
 import 'table_view.dart';
 
 class TablesPage extends StatefulWidget {
+  static const routeName = '/tables';
   const TablesPage({super.key});
   @override
   State<TablesPage> createState() => _TablesPageState();
@@ -24,16 +25,22 @@ class _TablesPageState extends State<TablesPage> with SingleTickerProviderStateM
     Tab(text: tableEinheiten),
     Tab(text: tableUser),
   ];
-  List<TableView> views = [];
   late TabController _tabController;
+  List<TableView> views = [];
   get table => views[_tabController.index].table;
+  List<GlobalKey> keys = [];
+  TableViewState get tabState => keys[_tabController.index].currentState! as TableViewState;
+  void updateTab({String? clause}) => tabState.update(clause: clause);
+  String? get whereClause => tabState.whereClause;
   @override
   void initState() {
     super.initState();
     for (var tab in tabs) {
-      views.add(TableView(table: tab.text!, updater: updateSelection,));
+      var key = GlobalKey<TableViewState>();
+      keys.add(key);
+      views.add(TableView(key: key, table: tab.text!, updater: updateSelection,));
     }
-    _tabController = TabController(vsync: this, length: tabs.length);
+    _tabController = TabController(vsync: this, length: tabs.length, animationDuration: Duration.zero);
     _tabController.addListener(() {
       updateSelection();
     });
@@ -50,7 +57,6 @@ class _TablesPageState extends State<TablesPage> with SingleTickerProviderStateM
       item.selected = selected!;
     }
     setState(() {
-      // debugPrint(persistenceProvider.list(table).map((e) => e.selected).toString());
       _index = persistenceProvider.firstSelectedIndex(table: table);
       debugPrint('_index $_index');
     });
@@ -65,29 +71,25 @@ class _TablesPageState extends State<TablesPage> with SingleTickerProviderStateM
           tabs: tabs,
         ),
         actions: [
-          Visibility(
-            visible: persistenceProvider.userIsAdmin(),
-            child: IconButton(
-              onPressed: () { addRow(context); }, 
-              icon: const Icon(Icons.add),
-              tooltip: 'Eintrag hinzufügen',
-            ),
+          IconButton(
+            onPressed: () { filterRows(context); }, 
+            icon: const Icon(Icons.filter_list),
+            tooltip: 'Filter definieren',
           ),
-          Visibility(
-            visible: persistenceProvider.userIsAdmin(),
-            child: IconButton(
-              onPressed: _index < 0 ? null : () { updateRow(context); },
-              icon: const Icon(Icons.edit),
-              tooltip: 'Eintrag bearbeiten',
-            ),
+          IconButton(
+            onPressed: () { addRow(context); }, 
+            icon: const Icon(Icons.add),
+            tooltip: Cause.add.title,
           ),
-          Visibility(
-            visible: persistenceProvider.userIsAdmin(),
-            child: IconButton(
-              onPressed: _index < 0 ? null : () { deleteRows(context); }, 
-              icon: const Icon(Icons.delete),
-              tooltip: 'Eintrag löschen',
-            ),
+          IconButton(
+            onPressed: _index < 0 ? null : () { updateRow(context); },
+            icon: const Icon(Icons.edit),
+            tooltip: Cause.update.title,
+          ),
+          IconButton(
+            onPressed: _index < 0 ? null : () { deleteRows(context); }, 
+            icon: const Icon(Icons.delete),
+            tooltip: Cause.delete.title2,
           ),
         ],
       ),
@@ -97,11 +99,22 @@ class _TablesPageState extends State<TablesPage> with SingleTickerProviderStateM
       ),
     );
   }
+
+  void filterRows(BuildContext context) async {
+    var where = await showDialog<String>(
+      context: context, 
+      builder: (BuildContext context) => FilterDialog(table: table, filter: whereClause),
+    );
+    if (where != null) {
+      updateTab(clause: where.isNotEmpty ? where : null);
+    }
+  }
   void deleteRows(BuildContext context) async {
-    String? result = await deletionDialog(context);
-    if (result != null) {
+    bool? result = await confirmation(context);
+    if (result ?? false) {
       await persistenceProvider.delete(null, table: tablePath(table));
       updateSelection();
+      updateTab();
     }
   }
   void updateRow(BuildContext context) async {
@@ -114,15 +127,18 @@ class _TablesPageState extends State<TablesPage> with SingleTickerProviderStateM
     );
     if (result != null && result.isNotEmpty) {
       updateSelection(item: row, selected: false);
+      updateTab();
     }
   }
   void addRow(BuildContext context) async {
+    Map row = {};
     var result = await showDialog(
       context: context, 
-      builder: (BuildContext context) => TableRowDialog(table: table, row: const {}),
+      builder: (BuildContext context) => TableRowDialog(table: table, row: row),
     );
     if (result != null && result.isNotEmpty) {
       updateSelection();
+      updateTab();
     }
   }
 }

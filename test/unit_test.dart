@@ -4,7 +4,7 @@
 // writing unit tests, visit
 // https://flutter.dev/docs/cookbook/testing/unit/introduction
 
-// ignore_for_file: avoid_print
+// ignore_for_file: avoid_print, curly_braces_in_flow_control_structures
 
 import 'dart:io';
 
@@ -19,14 +19,29 @@ import 'package:week_of_year/week_of_year.dart';
 import 'package:date_checker/date_checker.dart';
 import 'package:intl/intl.dart';
 
+dynamic dbFile;
+Future<void> checkServer(bool shouldBeAvailable) async {
+  if (!shouldBeAvailable) {
+    expect(() async { await killServer(); }, throwsException);
+  }
+  dbFile = await Persistor.perform('server');
+  expect(dbFile, shouldBeAvailable ? isNotNull: isNull);
+  expect(Persistor.serverAvailable, shouldBeAvailable);
+  // debugPrint(dbFile.toString());
+}
+
 void main() {
   late Process p;
   setUp(() async {
-    await killServer();
+    WidgetsFlutterBinding.ensureInitialized();
+    await checkServer(false);
     p = await runServer();
+    await checkServer(true);
   });
-
-  tearDown(() => p.kill());
+  tearDown(() {
+    dbService.close(doit: true);
+    p.kill();
+  });
 
   group('Verschiedenes', () {
     test('DateTime.weekOfYear', () {
@@ -45,22 +60,23 @@ void main() {
       print('weekEnd : ${weekEnd(date: today)}');
       print('weekOfYear 01/04 : ${DateTime(today.year, 1, 4).weekOfYear}');
       print('weekOfYear 12/28 : ${DateTime(today.year, 12, 28).weekOfYear}');
-      expect(DateTime(2020, 12, 28).weekOfYear, 53);
+      var dateTime = DateTime(2020, 12, 28);
+      expect(dateTime.weekOfYear, 53);
+      var add = dateTime.add(const Duration(days: 4));
+      expect(add.weekOfYear, 53);
     });
-    test('persistor', () async {
-      WidgetsFlutterBinding.ensureInitialized();
-      var dbFile = await checkServer(true);
-      var kwMap = await kwErtragMap();
-      await Persistor.perform('bye');
+    test('Persistor', () async {
+      var kwMap = await Persistor.kwErtragMap();
+      var dbfile = dbFile;
       await checkServer(false);
-      DatabaseHelper databaseHelper = DatabaseHelper(dbFile.toString());
+      DatabaseHelper databaseHelper = DatabaseHelper(dbfile.toString());
       var db = await databaseHelper.open();
       expect(db, isNotNull);
       var results = await db!.rawQuery('select distinct $columnKw from ertrag');
       expect(results.length, kwMap.length);
       await db.close();
       Object? result = await Persistor.perform('insert', 
-        data: Ertrag(weekOfYear(), 'Riesenkürbis', 1, 'Stück', '', '').record
+        data: Ertrag(weekOfYear(), 'Riesenkürbis', 3, 1, 'Stück', '', '').record
       );
       final ids = (result! as Map)[columnId];
       for (var id in ids) {
@@ -70,48 +86,86 @@ void main() {
         result = await Persistor.perform('delete', ids: [id]);
       }
     });
-    test('persistence provider', () async {
-      WidgetsFlutterBinding.ensureInitialized();
+    test('PersistenceProvider', () async {
+      Persistor.serverAvailable = false;
       PersistenceProvider persistenceProvider = PersistenceProvider();
       await persistenceProvider.persistenceCheck();
-      expect(Persistor.serverAvailable, false);
-      expect(await exist(tableEinheiten), true);
-      expect(await exist(tableKulturen), true);
       int cnt = 10;
-      var woy = weekOfYear();
+      String woy = weekOfYear();
       await persistenceProvider.randomRecords(cnt, kw: woy);
       await persistenceProvider.kwErtraege(woy);
       expect(persistenceProvider.ertragList.length, cnt);
-      await persistenceProvider.persistenceCheck();
+      await persistenceProvider.kwErtragMap();
       expect(persistenceProvider.kwMap.length, 1);
       expect(persistenceProvider.kwMap[woy]!.length, cnt);
-      await checkServer(true);
+      var woy2 = weekOfYear(plus: 1);
+      await persistenceProvider.copyErtraege(woy, woy2);
+      await persistenceProvider.kwErtraege(woy2);
+      expect(persistenceProvider.ertragList.length, cnt);
+      await persistenceProvider.kwErtragMap();
+      expect(persistenceProvider.kwMap.length, 2);
+      expect(persistenceProvider.kwMap[woy2]!.length, cnt);
+      await persistenceProvider.fetch(columnBemerkungen);
     });
-    test('tabellen', () async {
-      WidgetsFlutterBinding.ensureInitialized();
-      await checkServer(true);
+    test('Setup', () async {
+      for (var serverAvailable in [false, true]) {
+        Persistor.serverAvailable = serverAvailable;
+        var count = {};
+        for (var name in [tableKulturen, tableEinheiten]) {
+          setDatabase();
+          if (!Persistor.serverAvailable) {
+            expect(await Persistor.perform('count', path: tablePath(name)), isZero);
+            await setupTable(name);
+          }
+          count[name] = await Persistor.perform('count', path: tablePath(name));
+          if (!Persistor.serverAvailable) {
+            expect(count[name], (await defaultRecords(name)).length);
+          }
+          await setupTable(name);
+          expect(await Persistor.perform('count', path: tablePath(name)), count[name]);
+        }
+        PersistenceProvider persistenceProvider = PersistenceProvider();
+        var einheiten = await persistenceProvider.fetch(tableEinheiten);
+        expect(einheiten.length, count[tableEinheiten]);
+        for (var einheit in einheiten) expect(einheit.contains(', '), false);
+        var kulturen = await persistenceProvider.fetch(tableKulturen);
+        expect(kulturen.length, count[tableKulturen]);
+        for (var kultur in kulturen) expect(kultur.contains(', '), true);
+        kulturen = await persistenceProvider.fetch(tableKulturen, where: rowAktiv());
+      }
+    });
+    test('Tabellen', () async {
+      Persistor.serverAvailable = false;
       PersistenceProvider persistenceProvider = PersistenceProvider();
       await persistenceProvider.persistenceCheck();
-      await persistenceProvider.addRandomErtrag(cnt: 3);
       for (var table in tables) {
-        persistenceProvider.rows = [];
-        await persistenceProvider.getRows(table);
-        expect(persistenceProvider.rows, isNotEmpty);
+        Future<void> checkFilter(int sample, String name, dynamic result) async {
+          await persistenceProvider.getRows(table, where: filterSamples[sample]);
+          expect(persistenceProvider.rows.length, result is List ? result.length : result);
+          if (result is List) {
+            List column = persistenceProvider.column(name);
+            column.sort((a, b) => a.toString().compareTo(b.toString()));
+            expect(column, result);
+          }
+        }
         switch (table) {
-          case tableEinheiten:
-            print(persistenceProvider.rows);
+          case tableErtrag:
+            await Persistor.perform('delete', path: tablePath(table), where: 'all');
+            List<String> kws = ['2024-20','2024-30','2024-40',];
+            await persistenceProvider.addRandomErtrag(kws: kws);
+            await checkFilter(0, columnKw, kws);
+            await checkFilter(1, columnKw, kws.sublist(0, 2));
+            break;
+          case tableKulturen:
+            await checkFilter(2, columnKuerzel, ["Kno","KüBB","KüBu","KüDel","KüHokk","KüJabL","KüSW","KüSpagh"]);
+            await checkFilter(3, columnAktiv, 62);
             break;
           default:
+            await persistenceProvider.getRows(table);
+            expect(persistenceProvider.rows, isNotEmpty);
+            print('$table : ${persistenceProvider.rows.length}');
         }
       }
     });
   });
-}
-
-Future<Object?> checkServer(bool shouldBeAvailable) async {
-  var dbFile = await Persistor.perform('server');
-  debugPrint(dbFile.toString());
-  expect(dbFile, shouldBeAvailable ? isNotNull : isNull);
-  expect(Persistor.serverAvailable, shouldBeAvailable);
-  return dbFile;
 }

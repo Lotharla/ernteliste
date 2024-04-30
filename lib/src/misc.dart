@@ -61,17 +61,17 @@ class _LoginDialogState extends State<LoginDialog> {
                             labelText: '$columnName ?',
                           ),
                           focusNode: _focusNode,
-                          onFieldSubmitted: (name) async {
-                            final navi = Navigator.of(context);
+                          onFieldSubmitted: (name) {
                             final focusScope = FocusScope.of(context);
                             if ((persistenceProvider.userMap.containsKey(name) && 
-                                  persistenceProvider.userMap[name]!.aktiv != 0)) {
+                              persistenceProvider.userMap[name]!.aktiv != 0))
+                            {
                               persistenceProvider.setUser(name);
                               if (mess != null) {
                                 message(mess!);
                                 // await Future.delayed(const Duration(seconds: 2));
                               }
-                              navi.pop();
+                              Navigator.of(context).pop();
                             } else {
                               focusScope.requestFocus(_focusNode);
                             }
@@ -94,23 +94,43 @@ class _LoginDialogState extends State<LoginDialog> {
     );
   }
 }
-Future<String?> deletionDialog(BuildContext context, {bool thisOne = false}) {
-  return showDialog<String>(
+enum Cause { 
+  add(title: 'Eintrag hinzufügen', 
+    question: 'Diesen Eintrag hinzufügen', 
+    title2: 'Einträge hinzufügen',
+    question2: 'Einträge hinzufügen'),
+  update(title: 'Eintrag bearbeiten', 
+    question: 'Diesen Eintrag bearbeiten', 
+    title2: '', question2: ''),
+  delete(title: 'Lösche Eintrag', 
+    question: 'Diesen Eintrag löschen', 
+    title2: 'Lösche Einträge',
+    question2: 'Markierte Einträge löschen');
+  const Cause({required this.title, required this.question, required this.title2, required this.question2});
+  final String title;
+  final String question;
+  final String title2;
+  final String question2;
+}
+Future<bool?> confirmation(BuildContext context, {Cause cause = Cause.delete, bool singular = false}) {
+  return showDialog<bool>(
     context: context,
     builder: (BuildContext context) => AlertDialog(
-      title: const Text('Lösche Einträge'),
+      title: Text(
+        singular ? cause.title : cause.title2
+      ),
       // icon: const Icon(Icons.question_mark),
       content: Text(
-        thisOne ? 'Diesen Eintrag löschen' : 'Markierte Einträge löschen?'
+        '${singular ? cause.question : cause.question2} ?'
       ),
       actions: <Widget>[
         TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Abbrechen'),
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Nein'),
         ),
         TextButton(
-          onPressed: () => Navigator.pop(context, 'ok'),
-          child: const Text('OK'),
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('Ja'),
         ),
       ],
     ),

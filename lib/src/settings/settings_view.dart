@@ -10,7 +10,6 @@ import 'package:server/tables.dart';
 
 import 'settings_controller.dart';
 
-final now = DateTime.now();
 /// Displays the various settings that can be customized by the user.
 ///
 /// When a user changes a setting, the SettingsController is updated and
@@ -50,7 +49,7 @@ class _SettingsViewState extends State<SettingsView> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Settings'),
+        title: const Text('Einstellungen'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -62,9 +61,9 @@ class _SettingsViewState extends State<SettingsView> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
-              YearPickerWidget(
-                controller: widget.controller,
-              ),
+              // YearPickerWidget(
+              //   updateYear: widget.controller.updateYear,
+              // ),
               Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: DropdownButton<ThemeMode>(
@@ -92,20 +91,23 @@ class _SettingsViewState extends State<SettingsView> {
                 padding: const EdgeInsets.all(8.0),
                 child: ElevatedButton(
                   onPressed: () {
-                    NavigationService().navigateToScreen(
-                      const TablesPage(), 
-                    );
-                  },
-                  child: const Text("Tabellen bearbeiten"),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: ElevatedButton(
-                  onPressed: () {
                     loginDialog(context);
                   },
                   child: const Text("Erneut anmelden"),
+                ),
+              ),
+              Visibility(
+                visible: persistenceProvider.userIsAdmin(),
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: ElevatedButton(
+                    onPressed: () {
+                      NavigationService().navigateToScreen(
+                        const TablesPage(), 
+                      );
+                    },
+                    child: const Text("Tabellen bearbeiten"),
+                  ),
                 ),
               ),
             ],
@@ -117,14 +119,17 @@ class _SettingsViewState extends State<SettingsView> {
 }
 
 class YearPickerWidget extends StatefulWidget {
-  const YearPickerWidget({super.key, required this.controller});
-  final SettingsController controller;
+  const YearPickerWidget({super.key, required this.updateYear});
+  final Future<void> Function(DateTime) updateYear;
   @override
   State<YearPickerWidget> createState() => _YearPickerWidgetState();
 }
 class _YearPickerWidgetState extends State<YearPickerWidget> {
-  DateTime _selected = KwModel.refTime;
-  selectYear(context) async {
+  final now = DateTime.now();
+  final persistenceProvider =
+      Provider.of<PersistenceProvider>(AppConstant.globalNavigatorKey.currentContext!);
+  DateTime _selected = KwModel.refTime.value;
+  _selectYear(context) async {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -143,7 +148,8 @@ class _YearPickerWidgetState extends State<YearPickerWidget> {
                   _selected = dateTime;
                 });
                 Navigator.pop(context);
-                await widget.controller.updateYear(_selected);
+                await widget.updateYear(_selected);
+                await persistenceProvider.kwErtragMap();
               },
             ),
           ),
@@ -171,7 +177,7 @@ class _YearPickerWidgetState extends State<YearPickerWidget> {
           ),
           GestureDetector(
             onTap: () {
-              selectYear(context);
+              _selectYear(context);
             },
             child: const Icon(
               Icons.calendar_month,

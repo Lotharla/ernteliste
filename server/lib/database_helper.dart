@@ -4,20 +4,21 @@ import 'tables.dart';
 bool verbose = false;
 
 class DatabaseHelper extends SqfliteHelper {
-  static const _databaseVersion = 1;
+  static const _databaseVersion = 2;
   
   DatabaseHelper([String file = '']) {
     init(file);
   }
 
-  // ignore: avoid_init_to_null
-  Database? _db = null;
-  
-  bool get inMemory => databaseFile == inMemoryDatabasePath;
-
+  Database? _db;
+  bool multipart = false;
+  bool get keep => databaseFile == inMemoryDatabasePath || multipart;
+  Future _onConfigure(Database db) async {
+    await db.execute('PRAGMA foreign_keys = OFF');
+  }
   // this opens the database (and creates it if it doesn't exist)
   Future<Database?> open([bool empty = false]) async {
-    if (_db != null && inMemory) return _db;
+    if (_db != null && keep) return _db;
     String path = await databasePath();
     if (empty) {
       await deleteDatabase(path);
@@ -25,7 +26,15 @@ class DatabaseHelper extends SqfliteHelper {
     _db = await openDatabase(
       path,
       version: _databaseVersion,
+      onConfigure: _onConfigure,
       onCreate: _onCreate,
+      onUpgrade: (db, oldVersion, newVersion) async {
+        var batch = db.batch();
+        if (oldVersion == 1) {
+          _updateTableErtragV1toV2(batch);
+        }
+        await batch.commit();
+      },
     );
     if (verbose) print('open $path');
     return _db;
@@ -37,7 +46,7 @@ class DatabaseHelper extends SqfliteHelper {
       CREATE TABLE $tableUser (
         $columnName TEXT UNIQUE,
         $columnFunktion TEXT,
-        $columnAktiv INTEGER NOT NULL
+        $columnAktiv INTEGER NOT NULL CHECK ($columnAktiv IN (0,1))
       )
       ''');
     await db.execute('''
@@ -48,7 +57,7 @@ class DatabaseHelper extends SqfliteHelper {
         $columnArt TEXT,
         $columnSorte TEXT,
         $columnKuerzel TEXT,
-        $columnAktiv INTEGER,
+        $columnAktiv INTEGER NOT NULL CHECK ($columnAktiv IN (0,1)),
         UNIQUE($columnArt,$columnSorte,$columnKuerzel)
       )
       ''');
@@ -61,6 +70,7 @@ class DatabaseHelper extends SqfliteHelper {
       CREATE TABLE $tableErtrag (
         $columnKw TEXT,
         $columnKultur TEXT,
+        $columnSatz INTEGER,
         $columnMenge REAL,
         $columnEinheit TEXT,
         $columnBemerkungen TEXT,
@@ -68,9 +78,14 @@ class DatabaseHelper extends SqfliteHelper {
       )
       ''');
   }
+  void _updateTableErtragV1toV2(Batch batch) {
+    batch.execute('''
+      ALTER TABLE $tableErtrag ADD COLUMN $columnSatz INTEGER
+      ''');
+  }
 
-  Future<void> close() async {
-    if (inMemory) return;
+  Future<void> close({bool doit = false}) async {
+    if (_db == null || (keep && !doit)) return;
     await _db!.close();
     _db = null;
     if (verbose) print('close db');
@@ -83,7 +98,8 @@ class DatabaseHelper extends SqfliteHelper {
   // inserted row.
   Future<int> replace(Map<String, Object?> row, 
       {String table = tableErtrag,
-       conflictAlgorithm = ConflictAlgorithm.replace}) async {
+       conflictAlgorithm = ConflictAlgorithm.replace}
+  ) async {
     return await _db!.insert(table, row, conflictAlgorithm: conflictAlgorithm);
   }
 
@@ -98,7 +114,8 @@ class DatabaseHelper extends SqfliteHelper {
     bool? distinct,
     List<String>? projection,
     String? where,
-    List<Object?>? whereArgs}) async {
+    List<Object?>? whereArgs}
+  ) async {
     return await _db!.query(
       table, 
       distinct: distinct, 
@@ -121,9 +138,9 @@ class DatabaseHelper extends SqfliteHelper {
   }
 
   // All of the methods (insert, query, update, delete) can also be done using
-  // raw SQL commands. This method uses a raw query to give the max id.
-  Future<int> queryMaxId({String table = tableErtrag}) async {
-    final results = await _db!.rawQuery('SELECT MAX($columnId) FROM $table');
+  // raw SQL commands. This method uses a raw query to give the row count.
+  Future<int> queryStats({String stat = 'count', String table = tableErtrag}) async {
+    final results = await _db!.rawQuery('SELECT $stat($columnId) FROM $table');
     return firstIntValue(results) ?? 0;
   }
 
@@ -158,7 +175,7 @@ class DatabaseHelper extends SqfliteHelper {
 
   Future<List<int>> multiInsert(List<Map<String, Object?>> rows, {String table = tableErtrag}) async {
     List<int> ids = [];
-    int id = await queryMaxId();
+    int id = await queryStats(stat: 'max', table: table);
     var batch = _db!.batch();
     for (var row in rows) {
       row[columnId] = ++id;

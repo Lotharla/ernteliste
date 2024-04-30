@@ -1,13 +1,14 @@
+import 'package:ernteliste/src/persistence/persistor.dart';
 import 'package:ernteliste/src/settings/settings_controller.dart';
 import 'package:ernteliste/src/settings/settings_service.dart';
 import 'package:ernteliste/src/settings/settings_view.dart';
+import 'package:ernteliste/src/table/tables_page.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:ernteliste/src/navigation_service.dart';
-import 'package:ernteliste/src/kw_feature/kw_model.dart';
-import 'package:ernteliste/src/kw_feature/kw_list_view.dart';
+import 'package:ernteliste/src/kw_feature/kw_view.dart';
 import 'package:ernteliste/src/persistence/persistence_provider.dart';
-import 'package:ernteliste/src/ertrag_feature/kw_ertrag_view.dart';
+import 'package:ernteliste/src/ertrag_feature/ertrag_view.dart';
 import 'package:ernteliste/src/ertrag_feature/ertrag_form.dart';
 import 'package:server/tables.dart';
 import 'package:server/utils.dart';
@@ -47,9 +48,10 @@ class MyApp extends StatelessWidget {
             // ),
             home: const MyHomePage(),
             routes: {
-              KwListView.routeName: (context) => KwListView(KwModel.kwItems()),
+              KwListView.routeName: (context) => const KwListView(),
               KwErtragView.routeName: (context) => const KwErtragView(title: 'Kw'),
-              ErtragForm.routeName: (context) =>  const ErtragForm(title: null),
+              ErtragForm.routeName: (context) =>  const ErtragForm(),
+              TablesPage.routeName:(context) => const TablesPage(),
               SettingsView.routeName: (context) =>  SettingsView(controller: settingsController),
             },
           );
@@ -91,11 +93,18 @@ class _MyHomePageState extends State<MyHomePage> {
             ),
             ElevatedButton(
               onPressed: () {
+                Persistor.userAdmin = true;
+                Navigator.pushNamed(context, TablesPage.routeName);
+              },
+              child: const Text("TablesPage"),
+            ),
+            ElevatedButton(
+              onPressed: () {
                 NavigationService().navigateToScreen(
-                  KwListView(KwModel.kwItems()), 
+                  const KwListView(), 
                 );
               },
-              child: const Text("KwListView"),
+              child: const Text("KwView"),
             ),
             ElevatedButton(
               onPressed: () {
@@ -104,7 +113,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   arguments: {columnKw: kw, columnId: persistenceProvider.kwMap[kw]}
                 );
               },
-              child: const Text("KwErtragView"),
+              child: const Text("ErtragView"),
             ),
             ElevatedButton(
               onPressed: () {
@@ -133,7 +142,7 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          Provider.of<PersistenceProvider>(context, listen: false).addRandomErtrag(kw: kw);
+          Provider.of<PersistenceProvider>(context, listen: false).addRandomErtrag(kws: [kw]);
           _incrementCounter();
         },
         child: const Icon(Icons.refresh),
@@ -141,6 +150,7 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
   Future<void> navigateToErtragForm(BuildContext context) async {
+    var scaffoldMessenger = ScaffoldMessenger.of(context);
     int len = persistenceProvider.ertragList.length;
     // Navigator.push returns a Future that completes after calling
     // Navigator.pop on the Selection Screen.
@@ -162,7 +172,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
     // After the Selection Screen returns a result, hide any previous snackbars
     // and show the new result.
-    ScaffoldMessenger.of(context)
+    scaffoldMessenger
       ..removeCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text('$result')));
   }

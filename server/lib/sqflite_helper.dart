@@ -14,7 +14,14 @@ export 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 class SqfliteHelper {
   SqfliteHelper();
 
-  String databaseFile = inMemoryDatabasePath;
+  String _databaseFile = inMemoryDatabasePath;
+  String get databaseFile => _databaseFile;
+  set databaseFile(String newFile) {
+    _databaseFile = newFile;
+    if (!isMobile()) {
+      print('Database: $_databaseFile');
+    }
+  }
 
   bool isMobile() {
     return UniversalPlatform.isAndroid || UniversalPlatform.isIOS;

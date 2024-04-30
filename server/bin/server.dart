@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:args/args.dart';
-import "package:path/path.dart";
 
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart';
@@ -33,6 +32,8 @@ final _router = Router()
   ..delete('/ertrag', _ertragHandler)
   ..get('/table/<table>', _tableHandler)
   ..post('/table/<table>', _tableHandler)
+  ..get('/count/<table>', _tableHandler)
+  ..post('/setup/<table>', _tableHandler)
   ..put('/table/<table>', _tableHandler)
   ..patch('/table/<table>', _tableHandler)
   ..delete('/table/<table>', _tableHandler)
@@ -80,10 +81,11 @@ List<int>? queryParameterId(Request req) {
   }
   return ids;
 }
-bool contentJson(Request req) => req.headers['Content-Type']!.contains('application/json');
+bool jsonContent(Request req) => req.headers['Content-Type']!.contains('application/json');
 
 Future<Response> _ertragHandler(Request req) async {
   dynamic res = [];
+  String table = req.url.path == 'user' ? tableUser : tableErtrag;
   try {
     switch (req.method) {
       case 'GET':
@@ -96,11 +98,11 @@ Future<Response> _ertragHandler(Request req) async {
               funk: funk != null && funk.isNotEmpty && funk[0] != 'null' ? funk[0] : null
           ));
         } else {
-          return _tableHandler(req, tableErtrag);
+          return _tableHandler(req, table);
         }
         break;
       default:
-        return _tableHandler(req, tableErtrag);
+        return _tableHandler(req, table);
     }
   } catch (e) {
     print(e);
@@ -115,29 +117,36 @@ Future<Response> _tableHandler(Request req, String table) async {
     ids = queryParameterId(req);
   }
   List<String>? cols = queryParameterList(req.url, 'column');
+  List<String>? wheres = queryParameterList(req.url, 'where');
+  String? where = wheres == null ? null : wheres[0];
   try {
     final String json = ['GET', 'DELETE'].contains(req.method) ? '' : await req.readAsString();
     switch (req.method) {
       case 'GET':
-        res = await dbService.serve('query', ids: ids, kws: kws, cols: cols, table: table);
+        if (pathStartsWith(req.url.path, 'count')) {
+          res = await dbService.serve('count', table: table);
+        } else {
+          res = await dbService.serve('query', where: where, ids: ids, kws: kws, cols: cols, table: table);
+        }
         break;
       case 'POST':
-        if (contentJson(req)) {
-          res = await dbService.serve('insert', json: json, table: table);
+        if (jsonContent(req)) {
+          var oper = pathStartsWith(req.url.path, 'setup') ? 'Setup' : 'insert';
+          res = await dbService.serve(oper, json: json, table: table);
         }
         break;
       case 'PUT':
-        if (contentJson(req)) {
-          res = await dbService.serve('update', ids: ids, json: json, table: table);
+        if (jsonContent(req)) {
+          res = await dbService.serve('update', where: where, ids: ids, json: json, table: table);
         }
         break;
       case 'PATCH':
-        if (contentJson(req)) {
-          res = await dbService.serve('replace', json: json, table: table);
+        if (jsonContent(req)) {
+          res = await dbService.serve('upsert', where: where, json: json, table: table);
         }
         break;
       case 'DELETE':
-        res = await dbService.serve('delete', ids: ids, table: table);
+        res = await dbService.serve('delete', where: where, ids: ids, table: table);
         break;
     }
   } catch (e) {
@@ -151,7 +160,7 @@ Future<Response> _artHandler(Request req) async {
   try {
     switch (req.method) {
       case 'HEAD':
-        if (req.headers.containsKey('x_drop_table')) {
+        if (req.headers.containsKey('X_CLEAR_TABLE')) {
           res = await dbService.serve('clear', table: req.url.path);
         } else {
           var exists = await dbService.serve('exist', table: req.url.path);
@@ -174,9 +183,8 @@ Future<Response> _artHandler(Request req) async {
 }
 
 void main(List<String> args) async {
-  final String script = Platform.script.toFilePath();
-  final databaseFile = Platform.environment['DATABASE'] 
-    ?? join(dirname(script), 'ernteliste.db');
+  final config = await getConfig();
+  final databaseFile = Platform.environment['DATABASE'] ?? config['database'];
   dbService = DatabaseService.initialize(file: databaseFile);
 
   final parser = ArgParser();
@@ -222,7 +230,7 @@ void main(List<String> args) async {
     .addHandler(_router);
 
   // For running in containers, we respect the PORT environment variable.
-  final port = int.parse(Platform.environment['PORT'] ?? '8080');
+  final port = int.parse(Platform.environment['PORT'] ?? "${config['port']}");
   final server = await serve(handler, ip, port);
-  print('Server listening on port ${server.port}');
+  print(serverListening(port: '${server.port}'));
 }

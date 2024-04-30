@@ -8,6 +8,15 @@ import 'package:server/tables.dart';
 import 'package:server/utils.dart';
 import 'package:server/database_service.dart';
 import 'package:ernteliste/src/app_constant.dart';
+import 'package:logging/logging.dart';
+
+final log = Logger('PersistorLogger');
+void setLogging({Level level = Level.SEVERE}) {
+  Logger.root.level = level;
+  Logger.root.onRecord.listen((record) {
+    debugPrint('${record.level.name}: ${record.time}: ${record.message}');
+  });
+}
 
 DatabaseService dbService = DatabaseService.initialize();
 bool flutterTest() => dbService.flutterTest();
@@ -39,23 +48,51 @@ Future<void> setDatabase() async {
       message('Keine Persistenz der Daten...\nServer starten und neu anmelden!');
     }
   }
+  log.info('Database: ${Persistor.serverAvailable ? 'server' : dbService.databaseFile}');
 }
 Future<List<String>> getStrings(String name) async {
   String data = await rootBundle.loadString("assets/$name");
   return const LineSplitter().convert(data);
 }
-Future<void> setupTables() async {
-  for (String table in [tableKulturen, tableEinheiten]) {
-    await Persistor.perform('setup',
-      path: table,
-      data: await getStrings('${table.toLowerCase()}.txt'),
-    );
+Stream<List?> streamLinesFromAsset(String path) async* {
+  final stream = Stream.fromFuture(rootBundle.loadString('assets/$path'))
+    .transform(const LineSplitter());
+  await for (String row in stream) {
+    yield row.split(',');
   }
+}
+Future<List<dynamic>> defaultRecords(String table) async {
+  var records = [];
+  switch (table) {
+    case tableKulturen:
+      records += await loadRecords('Art_Sorte_Kuerzel.csv', 
+        streamer: streamLinesFromAsset,
+        headers: columns[tableKulturen]!, 
+        columnAktivDefault: 1);
+      records += await loadRecords('kulturen.txt', 
+        streamer: streamLinesFromAsset,
+        headers: columns[tableKulturen]!, 
+        columnAktivDefault: 0);
+      break;
+    case tableEinheiten:
+      records += await loadRecords('einheiten.txt', 
+        streamer: streamLinesFromAsset,
+        headers: columns[tableEinheiten]!);
+      break;
+  }
+  return records;
+}
+Future<void> setupTable(String name) async {
+  List<dynamic> records = await defaultRecords(name);
+  await Persistor.perform('insert',
+    path: 'setup/$name',
+    data: records,
+  );
 }
 
 Future<bool> exist(table) async => await Persistor.perform('exist', path: table) as bool;
 String tableName(String path) => path.substring(path.indexOf('/')+1);
-String tablePath(String table) => 'table/$table';
+String tablePath(String table, {String first = 'table'}) => '$first/$table';
 
 class Persistor {
   Persistor._();
@@ -67,17 +104,20 @@ class Persistor {
   static bool userAdmin = false;
   static bool serverAvailable = false;
   static Future<dynamic> perform(String oper, 
-      {List<int>? ids, 
+      {String? where,
+      List<int>? ids, 
       List<String>? kws, 
       List<String>? cols, 
       String path = tableErtrag, 
-      Object? data}) async {
+      Object? data}
+  ) async {
     if (serverAvailable || serverOnly(oper)) {
       var url = await serviceUrl(
         serverOnly(oper) ? '' 
-        : oper == 'who' ? 'user' 
-        : path.contains('/') ? path
-        : path.toLowerCase()
+          : oper == 'who' ? 'user' 
+          : oper == 'count' ? tablePath(tableName(path), first: 'count')
+          : path.contains('/') ? path
+          : path.toLowerCase()
       );
       var client = http.Client(); 
       try {
@@ -90,12 +130,14 @@ class Persistor {
             data = data as Map;
             params = 'who=${data[columnName]}&funk=${data[columnFunktion]}';
           } else {
-            params = queryParams(columnId, ids);
+            params = where == null ? '' : 'where=$where';
+            params += queryParams(columnId, ids);
             params += queryParams(columnKw, kws);
             params += queryParams('column', cols);
           }
           uri = Uri.parse('$url?$params');
         }
+        // debugPrint('uri: $uri');
         final headers = {"content-type": "application/json"};
         http.Response response;
         switch (oper) {
@@ -114,11 +156,12 @@ class Persistor {
             response = await client.head(uri);
             return response.headers['x_check_table'] == 'true';
           case 'clear':
-            response = await client.head(uri, headers: {'X_DROP_TABLE': 'true'});
+            response = await client.head(uri, headers: {'X_CLEAR_TABLE': 'true'});
             return null;
           case 'setup':
             response = await client.post(uri, headers: headers, body: jsonEncode(data));
             break;
+          case 'count':
           case 'fetch':
           case 'query':
             response = await client.get(uri);
@@ -126,7 +169,7 @@ class Persistor {
           case 'insert':
             response = await client.post(uri, headers: headers, body: jsonEncode(data));
             break;
-          case 'replace':
+          case 'upsert':
             response = await client.patch(uri, headers: headers, body: jsonEncode(data));
             break;
           case 'update':
@@ -147,7 +190,7 @@ class Persistor {
         }
       } 
       catch (ex) {
-        debugPrint(ex.toString());
+        if (!serverOnly(oper)) log.severe(ex.toString());
         return null;
       }
       finally { 
@@ -161,7 +204,11 @@ class Persistor {
       );
       return _result(oper, path, jsonEncode(res));
     } else {
-      var res = await dbService.serve(oper, 
+      var res = await dbService.serve(
+        pathStartsWith(path, 'setup') ? 'Setup' 
+          : oper == 'fetch' && pathStartsWith(path, 'table') ? 'query' 
+          : oper, 
+        where: where,
         ids: ids, 
         kws: kws, 
         cols: cols, 
@@ -176,12 +223,28 @@ class Persistor {
   static bool statusOK(http.Response response) => response.statusCode >= 200 && response.statusCode < 400;
   static Object? _result(String oper, String table, String res) {
     var data = jsonDecode(res);
-    if (oper != 'fetch' && (userAdmin || table != tableUser)) debugPrint('$oper $table : $data');
+    if (userAdmin || table != tableUser) {
+      log.info('$oper $table : $data');
+      // debugPrint(ellipsize('$oper $table : $data', maxLength: 150));
+    }
     return data;
   }
-}
 
-Future<Map<String,List<int>>> kwErtragMap() async {
-  List records = await Persistor.perform('query', cols: [columnId, columnKw]) as List;
-  return ertragMap(records.map((e) => e as Map<String, dynamic>).toList());
+  static Future<void> multiOpen() async {
+    if (!dbService.multipart) {
+      await dbService.open();
+      dbService.multipart = true;
+    }
+  }
+  static Future<void> multiClose() async {
+    if (dbService.multipart) {
+      dbService.multipart = false;
+      await dbService.close();
+    }
+  }
+
+  static Future<Map<String,List<int>>> kwErtragMap() async {
+    List records = await Persistor.perform('query', cols: [columnId, columnKw]) as List;
+    return ertragMap(records.map((e) => e as Map<String, dynamic>).toList());
+  }
 }

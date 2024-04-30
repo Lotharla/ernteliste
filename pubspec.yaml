@@ -26,6 +26,15 @@ dependencies:
   universal_platform: ^1.0.0+1
   universal_io: ^2.2.2
   collection: ^1.18.0
+  calendar_date_picker2:
+    git:
+      url: https://github.com/Lotharla/calendar_date_picker2.git
+      ref: main
+  logging: ^1.2.0
+  sqlparser: ^0.35.1
+  url_launcher: ^6.2.6
+  scroll_to_index: ^3.0.1
+    # path: ../calendar_date_picker2
 
 dev_dependencies:
   flutter_test:
@@ -41,7 +50,5 @@ flutter:
 
   assets:
     # Add assets from the images directory to the application.
+    - assets/
     - assets/images/
-    - assets/einheiten.txt
-    - assets/kulturen.txt
-    - assets/config.json

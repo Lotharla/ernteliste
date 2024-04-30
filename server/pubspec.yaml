@@ -18,6 +18,8 @@ dependencies:
   week_of_year: ^2.2.0
   http: ^1.1.0
   universal_platform: ^1.0.0+1
+  characters:
+  intl:
 
 dev_dependencies:
   lints: ^2.0.0

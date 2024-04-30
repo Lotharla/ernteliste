@@ -40,44 +40,67 @@ class DatabaseService extends DatabaseHelper {
       List<String>? kws, 
       List<String>? cols,
       String table = tableErtrag, 
-      String json = ""}) async {
+      String json = ""}
+  ) async {
     final db = await open();
+    final mp = multipart;
     dynamic res = [];
     try {
       switch (oper) {
         case 'exist':
           res = await db!.query('sqlite_master', where: 'name = ?', whereArgs: [table]);
           return jsonEncode(res.isNotEmpty);
+        case 'count':
+          res = await queryStats(stat: 'count', table: table);
+          return jsonEncode(res);
         case 'setup':
-          await db!.rawQuery('CREATE TABLE IF NOT EXISTS $table ($columnArt TEXT)');
-          res = await queryMaxId(table: table);
-          if (res == 0) {
+          await db!.rawQuery(
+            'CREATE TABLE IF NOT EXISTS $table ($columnArt TEXT)'
+          );
+          multipart = true;
+          final empty = await isEmpty(table);
+          multipart = mp;
+          if (empty) {
             String data = jsonDecode(json).reduce((value, element) {
               var s = value.startsWith("('") ? value : "('$value')";
               return "$s,('$element')";
             });
-            await db.rawQuery('INSERT INTO $table (art) VALUES $data');
+            await db.rawQuery('INSERT INTO $table ($columnArt) VALUES $data');
             if (verbose) print('setup: $table');
-            res = json;
           }
+          res = json;
+          break;
+        case 'Setup':
+          multipart = true;
+          if (await isEmpty(table)) {
+            res = await serve('insert', table: table, json: json);
+            res = jsonDecode(res);
+          }
+          multipart = mp;
           break;
         case 'fetch':
-          switch (table) {
-          case 'sqlite_master':
-            res = await db!.query('sqlite_master');
-            break;
-          case columnBemerkungen:
-            final results = await db!.rawQuery(
-              'SELECT DISTINCT $table FROM $tableErtrag ORDER BY $table COLLATE NOCASE ASC'
-            );
-            res = results.map((e) => e[columnBemerkungen]).toList();
-            break;
-          default:
-            final results = await db!.rawQuery(
-              'SELECT $columnArt FROM $table ORDER BY art COLLATE NOCASE ASC'
-            );
-            res = results.map((e) => e[columnArt]).toList();
-          }
+          await db!.transaction((txn) async {
+            switch (table) {
+            case 'sqlite_master':
+              res = await txn.query('sqlite_master');
+              break;
+            case columnBemerkungen:
+              final results = await txn.rawQuery(
+                'SELECT DISTINCT $table FROM $tableErtrag ORDER BY $table COLLATE NOCASE ASC'
+              );
+              res = results.map((e) => e[columnBemerkungen]).toList();
+              break;
+            default:
+              var sql = 'SELECT $columnArt FROM $table ORDER BY $columnArt COLLATE NOCASE ASC';
+              var results = await txn.rawQuery("PRAGMA table_info('$table')");
+              results.map((m) {
+                if (m.containsValue(columnAktiv)) sql += ' WHERE $columnAktiv <> 0';
+                return m;
+              });
+              results = await txn.rawQuery(sql);
+              res = results.map((e) => e[columnArt]).toList();
+            }
+          });
           break;
         case 'query':
           where = where ?? (
@@ -102,7 +125,7 @@ class DatabaseService extends DatabaseHelper {
           if (verbose) print('inserted row ids: $ids');
           res = ResponseModel(ids, 'inserted');
           break;
-        case 'replace':
+        case 'upsert':
           var row = jsonDecode(json) as Map<String,Object?>;
           if (row.containsKey(columnId) && row[columnId] == null) row.remove(columnId);
           final id = await replace(row, table: table);
@@ -135,11 +158,15 @@ class DatabaseService extends DatabaseHelper {
             }
             if (verbose)  print('deleted ${idsAffected.length} row(s)');
             res = ResponseModel(idsAffected, 'deleted');
+          } else if (where != null && where == 'all') {
+            multipart = true;
+            res = jsonDecode(await serve('clear', table: table));
+            multipart = mp;
           }
           break;
         case 'clear':
-          if (table == tableErtrag) {
-            int idsAffected = await deleteAllRows();
+          if (tables.contains(table)) {
+            int idsAffected = await deleteAllRows(table: table);
             if (verbose) print('deleted all row(s)');
             res = ResponseModel('all ($idsAffected)', 'deleted');
           } else {
@@ -154,12 +181,15 @@ class DatabaseService extends DatabaseHelper {
     } 
     catch (ex) {
       print(ex.toString());
+      multipart = false;
       return null;
     }
     finally {
       await close();
     }
   }
+
+  Future<bool> isEmpty(String table) async => (await serve('count', table: table)) == '0';
   Future<bool> isUser(String name, {String? funk}) async {
     final result = jsonDecode(await serve('query', 
       table: tableUser, 
@@ -180,7 +210,7 @@ class ResponseModel {
   Map<String, Object?> toJson() {
     return {
       columnId: id,
-      'record': content
+      'record(s)': content
     };
   }
 }

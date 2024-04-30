@@ -7,6 +7,95 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:server/tables.dart';
 
+import 'package:ernteliste/src/ertrag_feature/ertrag_form.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+class FilterDialog extends StatefulWidget {
+  final String table;
+  final String? filter;
+  const FilterDialog({super.key, required this.table, this.filter});
+
+  @override
+  State<FilterDialog> createState() => _FilterDialogState();
+}
+class _FilterDialogState extends State<FilterDialog> {
+  final persistenceProvider =
+      Provider.of<PersistenceProvider>(AppConstant.globalNavigatorKey.currentContext!);
+  final _formKey = GlobalKey<FormState>();
+  late TextEditingController _controller;
+  late FocusNode _focusNode;
+  @override
+  void initState() {
+    _controller = TextEditingController(text: widget.filter);
+    _focusNode = FocusNode();
+    super.initState();
+  }
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+  @override
+  Widget build(BuildContext context) {
+    _focusNode.requestFocus();
+    return Dialog(
+      child: Form(
+        key: _formKey,
+        child: Scaffold(
+          body: Column(
+            children: [
+              PopupListComposite(
+                label: 'Filterausdruck für "${widget.table}" (SQLite Where Clause)',
+                list: filterSamples,
+                controller: _controller,
+                separator: '$andOr\n',
+                focusNode: _focusNode,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Bitte einen Filterausdruck eingeben, Beispiele siehe Liste';
+                  } else if (value.contains(andOr)) {
+                    return "Filterausdruck ist fehlerhaft: entweder 'and' oder 'or'";
+                  }
+                  return null;
+                },
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  Uri uri = Uri.parse('https://www.sqlitetutorial.net/sqlite-where/');
+                  await launchUrl(uri, mode: LaunchMode.externalApplication); 
+                },
+                child: const Text('Hilfe zu SQLite Where Clause'),
+              ),
+              Row(
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Abbrechen'),
+                  ),
+                  TextButton(
+                    onPressed: () async {
+                      String result = '';
+                      if (_formKey.currentState!.validate()) {
+                        result = _controller.text.trim();
+                        // await persistenceProvider.getRows(widget.table, where: result);
+                      }
+                      if (context.mounted) {
+                        Navigator.pop(context, result);
+                      }
+                    },
+                    child: const Text('OK'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class TableRowDialog extends StatefulWidget {
   const TableRowDialog({super.key, required this.table, required this.row});
   final String table;
@@ -28,6 +117,7 @@ class _TableRowDialogState extends State<TableRowDialog> {
     for(String col in _columns) {
       dynamic val = widget.row[col];
       switch (col) {
+        case columnSatz:
         case columnMenge:
           val = val == null ? '0' : '$val';
           break;
@@ -82,16 +172,9 @@ class _TableRowDialogState extends State<TableRowDialog> {
                           ),
                         );
                       default:
-                        return Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: TextFormField(
-                            controller: _controllers[col],
-                            decoration: InputDecoration(
-                              border: const OutlineInputBorder(),
-                              labelText: col,
-                            ),
-                            focusNode: col == _columns.first ? _focusNode : null,
-                          ),
+                        return FormTextField(col,
+                          _controllers[col]!,
+                          focusNode: col == _columns.first ? _focusNode : null,
                         );
                       }
                     }).toList(),
@@ -106,7 +189,6 @@ class _TableRowDialogState extends State<TableRowDialog> {
                   ),
                   TextButton(
                     onPressed: () async {
-                      final navi = Navigator.of(context);
                       if (_formKey.currentState!.validate()) {
                         for (String col in _columns) {
                           switch (col) {
@@ -117,12 +199,14 @@ class _TableRowDialogState extends State<TableRowDialog> {
                               widget.row[col] = bool.parse(_controllers[col]!.text) ? 1 : 0;
                               break;
                             default:
-                              widget.row[col] = _controllers[col]!.text;
+                              widget.row[col] = _controllers[col]?.text;
                           }
                         }
-                        await persistenceProvider.insertOrUpdate(widget.row, table: tablePath(widget.table));
+                        await persistenceProvider.upsert(widget.row, table: tablePath(widget.table));
                       }
-                      navi.pop('ok');
+                      if (context.mounted) {
+                        Navigator.pop(context, 'ok');
+                      }
                     },
                     child: const Text('OK'),
                   ),

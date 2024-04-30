@@ -21,7 +21,10 @@ void main() {
   setUp(() async {
     // File(database).createSync(recursive: true);
     try {
-      p = await runServer(port: port, database: database);
+      p = await runServer(
+        port: port, 
+        database: database,
+      );
     } on Exception catch (e) {
       print(e);
     }
@@ -44,23 +47,60 @@ void main() {
       await http.get(Uri.parse('$url/bye/bye'));
     }, throwsException);
   });
-  test('Einheiten Kulturen', () async {
-    expect(await http.head(Uri.parse('$url/einheiten'), headers: {'X_DROP_TABLE': 'true'}), isA<http.Response>());
+  test('Setup Einheiten', () async {
+    await dbService.serve('clear', table: tableEinheiten);
+    expect(await dbService.isEmpty(tableEinheiten), true);
+    var records = await loadRecords('einheiten.txt', 
+      headers: columns[tableEinheiten]!);
+    var result = await dbService.serve('Setup', 
+      table: tableEinheiten, 
+      json: jsonEncode(records));
+    expect(jsonDecode(result), isA<Map>());
+    expect(await dbService.isEmpty(tableEinheiten), false);
+    result = await checkFetch(tableEinheiten);
+    List<String> data = await loadStrings('einheiten.txt');
+    data.sort(noCase);
+    expect(result, data);
+  }, timeout: Timeout.factor(timeoutFactor));
+  test('Setup Kulturen', () async {
+    await dbService.serve('clear', table: tableKulturen);
+    expect(await dbService.isEmpty(tableKulturen), true);
+    var records1 = await loadRecords('Art_Sorte_Kuerzel.csv', 
+      headers: columns[tableKulturen]!, 
+      columnAktivDefault: 1);
+    var records2 = await loadRecords('kulturen.txt', 
+      headers: columns[tableKulturen]!, 
+      columnAktivDefault: 0);
+    var result = await dbService.serve('Setup', 
+      table: tableKulturen, 
+      json: jsonEncode([...records1, ...records2])); // 
+    expect(jsonDecode(result), isA<Map>());
+    expect(await dbService.isEmpty(tableKulturen), false);
+    List results = await checkFetch(tableKulturen, where: rowAktiv());
+    for (var res in results) {
+      (res as Map).remove(columnId);
+    }
+    expect(results, records1);
+  }, timeout: Timeout.factor(timeoutFactor));
+  test('einheiten kulturen', () async {
+    await checkDrop(tableEinheiten);
     expect(await checkExists(tableEinheiten),false);
     var data = await checkSetup(tableEinheiten);
     expect(await checkExists(tableEinheiten),true);
     data.sort(noCase);
     var result = await checkFetch(tableEinheiten);
     expect(result, data);
-    expect(await http.head(Uri.parse('$url/kulturen'), headers: {'X_DROP_TABLE': 'true'}), isA<http.Response>());
+    await checkDrop(tableEinheiten);
+    await checkDrop(tableKulturen);
     expect(await checkExists(tableKulturen),false);
     data = await checkSetup(tableKulturen);
     expect(await checkExists(tableKulturen),true);
     data.sort(noCase);
     result = await checkFetch(tableKulturen);
     expect(result, data);
-  }, timeout: Timeout.factor(timeoutFactor));
-  test('user bemerkungen', () async {
+    await checkDrop(tableKulturen);
+  }, timeout: Timeout.factor(timeoutFactor), skip: true);
+  test('bemerkungen user', () async {
     await dbService.serve('clear');
     int cnt = 30;
     var data = await randomData(cnt);
@@ -68,6 +108,11 @@ void main() {
     expect(ids.length, cnt);
     var result = await checkFetch(columnBemerkungen);
     expect(cnt-result.length+1, isPositive);
+    var response = await http.get(Uri.parse('$url/user?'));
+    expect(response.body, isNotNull);
+    var users = jsonDecode(response.body);
+    expect(users, isList);
+    expect(users.length >= 1, true);
   }, timeout: Timeout.factor(timeoutFactor));
   test('ertrag kw', () async {
     await dbService.serve('clear');
@@ -101,7 +146,7 @@ void main() {
     var results = jsonDecode(await dbService.serve('query'));
     int len = results.length;
     for (int i=0; i<cnt; i++) {
-      var result = await dbService.serve('replace', json: jsonEncode(data[i]));
+      var result = await dbService.serve('upsert', json: jsonEncode(data[i]));
       expect(result, isNotNull);
       data[i][columnId] = jsonDecode(result)[columnId].first;
     }
@@ -113,7 +158,7 @@ void main() {
     }
     data[cnt-1][columnId] = id;
     for (int i=0; i<cnt; i++) {
-      var result = await dbService.serve('replace', json: jsonEncode(data[i]));
+      var result = await dbService.serve('upsert', json: jsonEncode(data[i]));
       expect(result, isNotNull);
     }
     results = jsonDecode(await dbService.serve('query'));
@@ -150,8 +195,9 @@ void main() {
     expect(i, cnt);
   }, timeout: Timeout.factor(timeoutFactor));
   test('ertrag fill', () async {
+    await dbService.serve('clear');
     var today = DateTime.now();
-    var kw0 = '${today.year}-0';
+    var kw0 = '${today.year}-00';
     expect(await checkQuery(kw: kw0), []);
     int cnt = 5;
     List data = await randomData(cnt, kw: kw0);
@@ -202,6 +248,11 @@ Future<dynamic> checkExists(String table) async {
   expect(response.statusCode, 200);
   expect(response.headers.containsKey('x_check_table'), true);
   return bool.parse(response.headers['x_check_table']!);
+}
+Future<dynamic> checkDrop(String table) async {
+  expect(
+    await http.head(Uri.parse('$url/${table.toLowerCase()}'), headers: {'X_CLEAR_TABLE': 'true'}), 
+    isA<http.Response>());
 }
 Future<List> checkInsert(String data) async {
   final response = await http.post(
@@ -258,11 +309,18 @@ Future<List> checkQuery({int? id, String? kw, String? column}) async {
   }
   return records as List;
 }
-Future<List> checkFetch(String table, {String params = ''}) async {
-  if (table != columnBemerkungen) table = table.toLowerCase();
-  final response = await http.get(
-    Uri.parse('$url/$table?$params'),
-  );
+Future<List> checkFetch(String table, {String where = ''}) async {
+  dynamic response;
+  if (where.isEmpty) {
+    if (table != columnBemerkungen) table = table.toLowerCase();
+    response = await http.get(
+      Uri.parse('$url/$table'),
+    );
+  } else {
+    response = await http.get(
+      Uri.parse('$url/table/$table?where=$where'),
+    );
+  }
   expect(response.statusCode, 200);
   expect(response.body, isNotNull);
   var records = jsonDecode(response.body);

@@ -1,3 +1,7 @@
+import 'package:intl/intl.dart';
+
+final mengeFormat = NumberFormat("##0.##", 'de_DE');
+
 const columnId = 'rowid';
 const tableUser = 'User';
 const columnName = 'Wer';
@@ -8,6 +12,7 @@ const columnKw = 'Kalenderwoche';
 const columnMenge = 'Menge';
 const columnEinheit = 'Einheit';
 const columnKultur = 'Kultur';
+const columnSatz = 'Satz';
 const columnBemerkungen = 'Bemerkungen';
 const tableKulturen = 'Kulturen';
 const tableEinheiten = 'Einheiten';
@@ -18,20 +23,23 @@ const columnKuerzel = 'Kürzel';
 final tables = [tableErtrag,tableKulturen,tableEinheiten,tableUser];
 final columns = {
   tableUser: [columnName,columnFunktion,columnAktiv],
-  tableErtrag: [columnKw,columnKultur,columnMenge,columnEinheit,columnBemerkungen,columnName],
+  tableErtrag: [columnKw,columnKultur,columnSatz,columnMenge,columnEinheit,columnBemerkungen,columnName],
   tableKulturen: [columnArt,columnSorte,columnKuerzel,columnAktiv],
   tableEinheiten: [columnArt],
 };
+String rowAktiv() => '$columnAktiv <> 0';
+
 mixin TableName {
   late String table;
 }
 class Ertrag with TableName {
-  Ertrag(this.kalenderWoche, this.kultur, this.menge, this.einheit, this.bemerkungen, this.name, {this.id}) {
+  Ertrag(this.kalenderWoche, this.kultur, this.satz, this.menge, this.einheit, this.bemerkungen, this.name, {this.id}) {
     table = tableErtrag;
   }
   int? id;
   String kalenderWoche;
   String kultur;
+  int satz;
   num menge;
   String einheit;
   String bemerkungen;
@@ -41,7 +49,8 @@ class Ertrag with TableName {
     return Ertrag(
       rec[columnKw] ?? '',
       rec[columnKultur] ?? '',
-      rec[columnMenge] ?? 0,
+      rec[columnSatz] ?? 1,
+      rec[columnMenge] ?? 0.0,
       rec[columnEinheit] ?? '',
       rec[columnBemerkungen] ?? '',
       rec[columnName] ?? '',
@@ -53,6 +62,7 @@ class Ertrag with TableName {
       columnId: id,
       columnKw: kalenderWoche,
       columnKultur: kultur,
+      columnSatz: satz,
       columnMenge: menge,
       columnEinheit: einheit,
       columnBemerkungen: bemerkungen,
@@ -166,3 +176,10 @@ Object? objectFrom(Map<String, dynamic> rec, String table) {
       return null;
   }
 }
+const andOr = 'and | or';
+const filterSamples = [
+  "$columnKw = '2024-30' or $columnKw <> '2024-30'",
+  "$columnKw >= '2024-20' and $columnKw < '2024-40'",
+  "$columnKuerzel LIKE 'Kü%' or $columnKuerzel LIKE 'Kn_'",
+  "$columnAktiv = 0 and $columnAktiv != 1",
+];

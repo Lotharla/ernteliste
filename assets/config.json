@@ -2,5 +2,5 @@
     "host":"localhost",
     "port":8080,
     "service":"ertrag",
-    "database":"/home/lotharla/devel/ernteliste/server/bin/ernteliste.db"
+    "database":"/home/lotharla/devel/solawi/ernteliste/data/ernteliste.db"
 }
