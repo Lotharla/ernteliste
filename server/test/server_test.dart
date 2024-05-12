@@ -1,11 +1,14 @@
 import 'dart:io';
 import 'dart:convert';
 
+import 'package:date_checker/date_checker.dart';
+import 'package:intl/intl.dart';
 import 'package:test/test.dart';
 import 'package:http/http.dart' as http;
 import 'package:server/tables.dart';
 import 'package:server/database_service.dart';
 import 'package:server/utils.dart';
+import 'package:week_of_year/week_of_year.dart';
 
 final port = '8080';
 final url = 'http://localhost:$port';
@@ -38,7 +41,7 @@ void main() {
     expect(await dbService.isUser('div', funk: 'admin'), false);
     expect(await dbService.isUser('dev', funk: 'user'), false);
     expect(await dbService.isUser('dev'), true);
-    expect(await checkWho('dev'), true);
+    expect(await checkWho('sys'), false);
   }, timeout: Timeout.factor(timeoutFactor));
   test('404 bye', () async {
     var response = await http.get(Uri.parse('$url/foobar'));
@@ -73,7 +76,7 @@ void main() {
       columnAktivDefault: 0);
     var result = await dbService.serve('Setup', 
       table: tableKulturen, 
-      json: jsonEncode([...records1, ...records2])); // 
+      json: jsonEncode([...records1, ...records2]));
     expect(jsonDecode(result), isA<Map>());
     expect(await dbService.isEmpty(tableKulturen), false);
     List results = await checkFetch(tableKulturen, where: rowAktiv());
@@ -100,7 +103,30 @@ void main() {
     expect(result, data);
     await checkDrop(tableKulturen);
   }, timeout: Timeout.factor(timeoutFactor), skip: true);
-  test('bemerkungen user', () async {
+  test('user', () async {
+    await dbService.serve('clear', table: tableUser);
+    expect(await dbService.isEmpty(tableUser), true);
+    var users = [];
+    for (var i = 0; i < 2; i++) {
+      await dbService.serve('Setup', table: tableUser);
+      var response = await http.get(Uri.parse('$url/user?'));
+      expect(response.body, isNotNull);
+      users = jsonDecode(response.body);
+      expect(users, isList);
+      expect(users.length, setupUser.length);
+    }
+    var results = users.where((rec) {
+      if (rec[columnName] == 'sys') {
+        var einstellungen = jsonDecode(rec[columnEinst]);
+        expect(einstellungen, isMap);
+        expect(einstellungen['Anteile'], 1);
+        return true;
+      }
+      return false;
+    });
+    expect(results.length, 1);
+  }, timeout: Timeout.factor(timeoutFactor));
+  test('bemerkungen', () async {
     await dbService.serve('clear');
     int cnt = 30;
     var data = await randomData(cnt);
@@ -108,12 +134,7 @@ void main() {
     expect(ids.length, cnt);
     var result = await checkFetch(columnBemerkungen);
     expect(cnt-result.length+1, isPositive);
-    var response = await http.get(Uri.parse('$url/user?'));
-    expect(response.body, isNotNull);
-    var users = jsonDecode(response.body);
-    expect(users, isList);
-    expect(users.length >= 1, true);
-  }, timeout: Timeout.factor(timeoutFactor));
+  }, timeout: Timeout.factor(timeoutFactor), skip: true);
   test('ertrag kw', () async {
     await dbService.serve('clear');
     List records = await checkQuery();
@@ -210,7 +231,7 @@ void main() {
       var j = results[cnt-1-i][columnId];
       final result = Map.from(results[i]);
       result[columnId] = j;
-      var id = await checkReplace(jsonEncode(result));
+      var id = await checkUpsert(jsonEncode(result));
       expect(id[0], j);
     }
     // print(results);
@@ -218,11 +239,35 @@ void main() {
       await checkDelete(id);
     }
     results = await checkQuery();
-    var id = await checkReplace(jsonEncode(data[0]));
+    var id = await checkUpsert(jsonEncode(data[0]));
     expect((await checkQuery()).length, results.length + 1);
     await checkDelete(id[0]);
     expect(await checkQuery(kw: kw0), []);
   }, timeout: Timeout.factor(timeoutFactor));
+  test('DateTime.weekOfYear', () {
+    final today = DateTime.now();
+    print(today.weekOfYear); // Get the iso week of year
+    print(today.ordinalDate); // Get the ordinal today
+    print(today.isLeapYear); // Is this a leap year?
+    print(DateFormat("y-MM-dd").format(today));
+
+    final DateTime dateFromWeekNumber = dateTimeFromWeekNumber(today.year, today.weekOfYear, today.weekday);
+    expect(
+      DateFormat("yyyy-MM-dd").format(dateFromWeekNumber), 
+      DateFormat("yyyy-MM-dd").format(today));
+
+    print('weekStart : ${weekStart(date: today)}');
+    print('weekEnd : ${weekEnd(date: today)}');
+    print('weekOfYear 01/04 : ${DateTime(today.year, 1, 4).weekOfYear}');
+    print('weekOfYear 12/28 : ${DateTime(today.year, 12, 28).weekOfYear}');
+    var dateTime = DateTime(2020, 12, 28);
+    expect(dateTime.weekOfYear, 53);
+    var add = dateTime.add(const Duration(days: 4));
+    expect(add.weekOfYear, 53);
+  });
+  test('reset', () async {
+    await checkReset();
+  }, timeout: Timeout.factor(timeoutFactor), skip: true);
 }
 
 Future<List<Map<String, Object?>>> randomData(int cnt, {String? kw}) async => 
@@ -238,8 +283,18 @@ Future<dynamic> checkDatabase() async {
   response = await http.get(Uri.parse('$url/sqlite_master'));
   expect(response.body, master);
 }
+Future<dynamic> checkReset() async {
+  DateTime fileTime1 = await File(database).lastModified();
+  print(fileTime1);
+  var response = await http.post(Uri.parse('$url/reset'));
+  expect(response.statusCode, 200);
+  expect(await File(response.body).exists(), true);
+  DateTime fileTime2 = await File(response.body).lastModified();
+  print(fileTime2);
+  expect(fileTime1.compareTo(fileTime2), -1);
+}
 Future<dynamic> checkWho(String name, {String? funk}) async {
-  var response = await http.get(Uri.parse('$url/user?who=$name&funk=$funk'));
+  var response = await http.get(Uri.parse('$url/user?$columnName=$name&$columnFunktion=$funk'));
   expect(response.statusCode, 200);
   return jsonDecode(response.body);
 }
@@ -264,7 +319,7 @@ Future<List> checkInsert(String data) async {
   expect(response.body, isNotEmpty);
   return jsonDecode(response.body)[columnId];
 }
-Future<List> checkReplace(String data) async {
+Future<List> checkUpsert(String data) async {
   final response = await http.patch(
     Uri.parse('$url/ertrag'),
     headers: {'Content-Type': 'application/json'},

@@ -11,8 +11,8 @@ class DatabaseService extends DatabaseHelper {
     if (file.isNotEmpty) instance.databaseFile = file;
     return instance;
   }
-  Future<void> touch({bool? clear}) async {
-    await open(clear ?? false);
+  Future<void> touch({bool? reset}) async {
+    await open(reset ?? false);
     await close();
   }
   Future<DatabaseService> info() async {
@@ -72,9 +72,19 @@ class DatabaseService extends DatabaseHelper {
           break;
         case 'Setup':
           multipart = true;
-          if (await isEmpty(table)) {
-            res = await serve('insert', table: table, json: json);
-            res = jsonDecode(res);
+          switch (table) {
+          case tableUser:
+            await db!.transaction((txn) async {
+              for (var i = 0; i < setupUser.length; i++) {
+                await txn.execute(setupUser[i]);
+              }
+            });
+            break;
+          default:
+            if (await isEmpty(table)) {
+              res = await serve('insert', table: table, json: json);
+              res = jsonDecode(res);
+            }
           }
           multipart = mp;
           break;
@@ -173,6 +183,10 @@ class DatabaseService extends DatabaseHelper {
             await db!.rawQuery('DROP TABLE IF EXISTS $table');
             if (verbose) print("table '$table' dropped");
           }
+          break;
+        case 'reset':
+          touch(reset: true);
+          res = ResponseModel('database', 'reset');
           break;
         default:
           throw Exception('illegal operation');

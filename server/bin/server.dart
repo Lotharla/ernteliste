@@ -15,6 +15,7 @@ late DatabaseService dbService;
 // Configure routes.
 final _router = Router()
   ..get('/', _rootHandler)
+  ..post('/reset', _rootHandler)
   ..get('/sqlite_master', _artHandler)
   ..get('/$columnBemerkungen', _artHandler)
   ..head('/einheiten', _artHandler)
@@ -44,7 +45,7 @@ final _router = Router()
     });
 
 Future<Response> _rootHandler(Request req) async {
-  await dbService.touch();
+  await dbService.touch(reset: req.method == 'POST' && req.url.path == 'reset');
   var databaseFile = dbService.databaseFile;
   if (await File(databaseFile).exists()) {
     return Response.ok(databaseFile);
@@ -89,9 +90,9 @@ Future<Response> _ertragHandler(Request req) async {
   try {
     switch (req.method) {
       case 'GET':
-        var who = queryParameterList(req.url, 'who');
+        var who = queryParameterList(req.url, columnName);
         if (who != null) {
-          var funk = queryParameterList(req.url, 'funk');
+          var funk = queryParameterList(req.url, columnFunktion);
           res = jsonEncode(
             await dbService.isUser(
               who[0], 

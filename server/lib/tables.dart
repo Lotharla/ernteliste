@@ -10,6 +10,7 @@ const columnAktiv = 'aktiv';
 const tableErtrag = 'Ertrag';
 const columnKw = 'Kalenderwoche';
 const columnMenge = 'Menge';
+const columnAnteile = 'Anteile';
 const columnEinheit = 'Einheit';
 const columnKultur = 'Kultur';
 const columnSatz = 'Satz';
@@ -19,38 +20,42 @@ const tableEinheiten = 'Einheiten';
 const columnArt = 'Art';
 const columnSorte = 'Sorte';
 const columnKuerzel = 'Kürzel';
+const columnFarbe = 'Farbe';
+const columnEinst = 'Einstellungen';
 
 final tables = [tableErtrag,tableKulturen,tableEinheiten,tableUser];
 final columns = {
-  tableUser: [columnName,columnFunktion,columnAktiv],
-  tableErtrag: [columnKw,columnKultur,columnSatz,columnMenge,columnEinheit,columnBemerkungen,columnName],
-  tableKulturen: [columnArt,columnSorte,columnKuerzel,columnAktiv],
+  tableUser: [columnName,columnFunktion,columnAktiv,columnEinst],
+  tableErtrag: [columnKw,columnKultur,columnSatz,columnMenge,columnAnteile,columnEinheit,
+    columnBemerkungen,columnName],
+  tableKulturen: [columnArt,columnSorte,columnKuerzel,columnAktiv,columnFarbe],
   tableEinheiten: [columnArt],
 };
 String rowAktiv() => '$columnAktiv <> 0';
 
 mixin TableName {
   late String table;
+  bool selected = false;
 }
 class Ertrag with TableName {
-  Ertrag(this.kalenderWoche, this.kultur, this.satz, this.menge, this.einheit, this.bemerkungen, this.name, {this.id}) {
+  Ertrag(this.kalenderWoche, this.kultur, this.satz, this.menge, this.anteile, this.einheit, this.bemerkungen, this.name, {this.id}) {
     table = tableErtrag;
   }
   int? id;
   String kalenderWoche;
   String kultur;
   int satz;
-  num menge;
+  num menge, anteile;
   String einheit;
   String bemerkungen;
   String name;
-  bool selected = false;
   factory Ertrag.from(Map<String, dynamic> rec) {
     return Ertrag(
       rec[columnKw] ?? '',
       rec[columnKultur] ?? '',
       rec[columnSatz] ?? 1,
       rec[columnMenge] ?? 0.0,
+      rec[columnAnteile] ?? 0.0,
       rec[columnEinheit] ?? '',
       rec[columnBemerkungen] ?? '',
       rec[columnName] ?? '',
@@ -64,6 +69,7 @@ class Ertrag with TableName {
       columnKultur: kultur,
       columnSatz: satz,
       columnMenge: menge,
+      columnAnteile: anteile,
       columnEinheit: einheit,
       columnBemerkungen: bemerkungen,
       columnName: name
@@ -75,19 +81,20 @@ class Ertrag with TableName {
   }
 }
 class User with TableName {
-  User(this.name, this.funktion, this.aktiv, {this.id = 0}) {
+  User(this.name, this.funktion, this.aktiv, this.einstellungen, {this.id = 0}) {
     table = tableUser;
   }
   int id;
   String name;
   String funktion;
   int aktiv;
-  bool selected = false;
+  String einstellungen;
   factory User.from(Map<String, dynamic> rec) {
     return User(
       rec[columnName] ?? '',
       rec[columnFunktion] ?? '',
       rec[columnAktiv] ?? 0,
+      rec[columnEinst] ?? '{}',
       id: rec[columnId]
     );
   }
@@ -96,7 +103,8 @@ class User with TableName {
       columnId: id,
       columnName: name,
       columnFunktion: funktion,
-      columnAktiv: aktiv
+      columnAktiv: aktiv,
+      columnEinst: einstellungen,
     };
   }
   @override
@@ -104,8 +112,18 @@ class User with TableName {
     return record.toString();
   }
 }
+var setupUser = ['''
+  INSERT OR IGNORE INTO $tableUser ($columnName, $columnFunktion, $columnAktiv, $columnEinst) 
+  VALUES ('sys', '', 0, '{"$columnAnteile" : 1}')
+  ''', '''
+  INSERT OR IGNORE INTO $tableUser ($columnName, $columnFunktion, $columnAktiv, $columnEinst) 
+  VALUES ('dev', 'admin', 1, '{}')
+  ''', '''
+  INSERT OR IGNORE INTO $tableUser ($columnName, $columnFunktion, $columnAktiv, $columnEinst) 
+  VALUES ('usr', 'user', 1, '{}')
+  '''];
 class Kultur with TableName {
-  Kultur(this.art, this.sorte, this.kuerzel, this.aktiv, {this.id = 0}) {
+  Kultur(this.art, this.sorte, this.kuerzel, this.aktiv, this.farbe, {this.id = 0}) {
     table = tableKulturen;
   }
   int id;
@@ -113,13 +131,14 @@ class Kultur with TableName {
   String sorte;
   String kuerzel;
   int aktiv;
-  bool selected = false;
+  String farbe;
   factory Kultur.from(Map<String, dynamic> rec) {
     return Kultur(
       rec[columnArt] ?? '',
       rec[columnSorte] ?? '',
       rec[columnKuerzel] ?? '',
       rec[columnAktiv] ?? 0,
+      rec[columnFarbe] ?? '',
       id: rec[columnId]
     );
   }
@@ -129,7 +148,8 @@ class Kultur with TableName {
       columnArt: art,
       columnSorte: sorte,
       columnKuerzel: kuerzel,
-      columnAktiv: aktiv
+      columnAktiv: aktiv,
+      columnFarbe: farbe,
     };
   }
   @override
@@ -143,7 +163,6 @@ class Einheit with TableName {
   }
   int id;
   String art;
-  bool selected = false;
   factory Einheit.from(Map<String, dynamic> rec) {
     return Einheit(
       rec[columnArt] ?? '',

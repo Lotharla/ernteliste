@@ -3,7 +3,8 @@ import 'package:ernteliste/src/kw_feature/kw_model.dart';
 import 'package:ernteliste/src/misc.dart';
 import 'package:ernteliste/src/navigation_service.dart';
 import 'package:ernteliste/src/persistence/persistence_provider.dart';
-import 'package:ernteliste/src/table/tables_page.dart';
+import 'package:ernteliste/src/persistence/persistor.dart';
+import 'package:ernteliste/src/tables/tables_page.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:server/tables.dart';
@@ -33,7 +34,7 @@ class _SettingsViewState extends State<SettingsView> {
   @override
   void initState() {
     focusNode = FocusNode();
-    if (persistenceProvider.userName.isEmpty) {
+    if (Persistor.userName.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
         loginDialog(context);
       });
@@ -45,11 +46,35 @@ class _SettingsViewState extends State<SettingsView> {
     focusNode.dispose();
     super.dispose();
   }
+  // ignore: unused_field
+  int _counter = 0;
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Einstellungen'),
+          // actions: [
+          // IconButton(
+          //   icon: const Icon(Icons.login),
+          //   tooltip: 'Erneut anmelden',
+          //   onPressed: () async {
+          //     loginDialog(context);
+          //     setState(() {
+          //       _counter++;
+          //     });
+          //   },
+          // ),
+          // Visibility(
+          //   visible: persistenceProvider.userIsAdmin(),
+          //   child: IconButton(
+          //     icon: const Icon(Icons.table_chart),
+          //     tooltip: 'Tabellen bearbeiten',
+          //     onPressed: () {
+          //       NavigationService().navigateToScreen(const TablesPage());
+          //     },
+          //   ),
+          // ),
+          // ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -61,9 +86,6 @@ class _SettingsViewState extends State<SettingsView> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
-              // YearPickerWidget(
-              //   updateYear: widget.controller.updateYear,
-              // ),
               Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: DropdownButton<ThemeMode>(
@@ -87,33 +109,79 @@ class _SettingsViewState extends State<SettingsView> {
                   ],
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: ElevatedButton(
-                  onPressed: () {
+              iconField(context, 
+                IconButton(
+                  icon: const Icon(Icons.login),
+                  tooltip: 'Erneut anmelden',
+                  onPressed: () async {
                     loginDialog(context);
+                    setState(() {
+                      _counter++;
+                    });
                   },
-                  child: const Text("Erneut anmelden"),
-                ),
+                )
               ),
               Visibility(
                 visible: persistenceProvider.userIsAdmin(),
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: ElevatedButton(
+                child: iconField(context, 
+                  IconButton(
+                    icon: const Icon(Icons.table_chart),
+                    tooltip: 'Tabellen bearbeiten',
                     onPressed: () {
-                      NavigationService().navigateToScreen(
-                        const TablesPage(), 
-                      );
+                      NavigationService().navigateToScreen(const TablesPage());
                     },
-                    child: const Text("Tabellen bearbeiten"),
-                  ),
+                  )
                 ),
               ),
+              // YearPickerWidget(
+              //   updateYear: widget.controller.updateYear,
+              // ),
+              // Padding(
+              //   padding: const EdgeInsets.all(8.0),
+              //   child: ElevatedButton(
+              //     onPressed: () {
+              //       loginDialog(context);
+              //     },
+              //     child: const Text("Erneut anmelden"),
+              //   ),
+              // ),
+              // Visibility(
+              //   visible: persistenceProvider.userIsAdmin(),
+              //   child: Padding(
+              //     padding: const EdgeInsets.all(8.0),
+              //     child: ElevatedButton(
+              //       onPressed: () {
+              //         NavigationService().navigateToScreen(
+              //           const TablesPage(), 
+              //         );
+              //       },
+              //       child: const Text("Tabellen bearbeiten"),
+              //     ),
+              //   ),
+              // ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Container iconField(BuildContext context, IconButton button) {
+    return Container(
+      margin: const EdgeInsets.all(8.0),
+      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+      decoration: BoxDecoration(
+        border: Border.all(),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      width: MediaQuery.of(context).size.width,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(button.tooltip ?? ''),
+          button,
+        ],
+      )
     );
   }
 }

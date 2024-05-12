@@ -22,13 +22,18 @@ DatabaseService dbService = DatabaseService.initialize();
 bool flutterTest() => dbService.flutterTest();
 
 String? mess;
-void message(String msg) {
-  BuildContext? context = AppConstant.globalScaffoldKey.currentContext;
-  if (context != null) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+void message([String? msg]) {
+  if (msg != null) {
+    BuildContext? context = AppConstant.globalScaffoldKey.currentContext;
+    if (context != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    } else {
+      mess = msg;
+    }
+  } else if (mess != null) {
+    msg = mess!;
     mess = null;
-  } else {
-    mess = msg;
+    message(msg);
   }
 }
 Future<Map<String, dynamic>> loadConfig() async {
@@ -101,7 +106,6 @@ class Persistor {
     path = path ?? config['service'];
     return 'http://${config['host']}:${config['port']}/$path';
   }
-  static bool userAdmin = false;
   static bool serverAvailable = false;
   static Future<dynamic> perform(String oper, 
       {String? where,
@@ -115,6 +119,7 @@ class Persistor {
       var url = await serviceUrl(
         serverOnly(oper) ? '' 
           : oper == 'who' ? 'user' 
+          : oper == 'reset' ? 'reset'
           : oper == 'count' ? tablePath(tableName(path), first: 'count')
           : path.contains('/') ? path
           : path.toLowerCase()
@@ -128,7 +133,7 @@ class Persistor {
           String params;
           if (oper == 'who') {
             data = data as Map;
-            params = 'who=${data[columnName]}&funk=${data[columnFunktion]}';
+            params = '$columnName=${data[columnName]}&$columnFunktion=${data[columnFunktion]}';
           } else {
             params = where == null ? '' : 'where=$where';
             params += queryParams(columnId, ids);
@@ -141,6 +146,9 @@ class Persistor {
         final headers = {"content-type": "application/json"};
         http.Response response;
         switch (oper) {
+          case 'reset':
+            response = await http.post(uri);
+            return response.body;
           case 'bye':
             response = await http.get(uri);
             return response.body;
@@ -246,5 +254,37 @@ class Persistor {
   static Future<Map<String,List<int>>> kwErtragMap() async {
     List records = await Persistor.perform('query', cols: [columnId, columnKw]) as List;
     return ertragMap(records.map((e) => e as Map<String, dynamic>).toList());
+  }
+
+  static bool userAdmin = false;
+  static Map<String,User> userMap = {};
+  static Future<void> users() async {
+    List records = await Persistor.perform('query', path: tableUser);
+    userMap = {};
+    for (var r in records) {
+      userMap[r[columnName]] = User.from(r);
+    }
+  }
+  static String userName = '';
+  static Map settings() => jsonDecode(userMap[userName]!.einstellungen) as Map;
+  static getUserSetting(name) {
+    if (userName.isEmpty) {
+      return null;
+    }
+    return settings()[name];
+  }
+  static putUserSetting(name, value) async {
+    if (userName.isNotEmpty) {
+      Map einstellungen = settings();
+      einstellungen[name] = value;
+      var data = userMap[userName]!.record;
+      data[columnEinst] = jsonEncode(einstellungen);
+      await Persistor.perform('update', 
+        data: data, 
+        ids: [userMap[userName]!.id], 
+        path: tableUser,
+      );
+      await users();
+    }
   }
 }

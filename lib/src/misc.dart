@@ -1,12 +1,80 @@
 // ignore_for_file: curly_braces_in_flow_control_structures
 
+import 'dart:math';
+
 import 'package:ernteliste/src/app_constant.dart';
 import 'package:ernteliste/src/persistence/persistor.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:server/tables.dart';
 import 'package:ernteliste/src/persistence/persistence_provider.dart';
 
+class FormTextField extends StatelessWidget {
+  final String label;
+  final TextEditingController? controller;
+  final TextInputType? keyboardType;
+  final List<TextInputFormatter>? inputFormatters;
+  final TextAlign textAlign;
+  final TextStyle? style;
+  final FocusNode? focusNode;
+  final bool autofocus;
+  final int? maxLines;
+  final Function(String)? onChanged;
+  final Function(String)? onFieldSubmitted;
+  final String? initialValue;
+  final bool readOnly;
+  final String? Function(String?)? validator;
+  const FormTextField(this.label, this.controller, {
+    this.keyboardType, 
+    this.inputFormatters,
+    this.textAlign = TextAlign.start,
+    this.style,
+    this.focusNode,
+    this.autofocus = false,
+    this.maxLines = 1,
+    this.onChanged,
+    this.onFieldSubmitted,
+    this.initialValue,
+    this.readOnly = false,
+    this.validator,
+    super.key
+  });
+  @override
+  Widget build(BuildContext context) {
+    if (autofocus) {
+      selectText();
+    }
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: TextFormField(
+        controller: controller,
+        decoration: InputDecoration(
+          border: const OutlineInputBorder(),
+          labelText: label,
+        ),
+        keyboardType: keyboardType,
+        inputFormatters: inputFormatters,
+        textAlign: textAlign,
+        style: style,
+        focusNode: focusNode,
+        autofocus: autofocus,
+        maxLines: maxLines,
+        onChanged: onChanged,
+        onTap: selectText,
+        onFieldSubmitted: onFieldSubmitted,
+        initialValue: initialValue,
+        readOnly: readOnly,
+        validator: validator,
+      ),
+    );
+  }
+  void selectText() {
+    if (controller != null) {
+      controller!.selection = TextSelection(baseOffset: 0, extentOffset: controller!.text.length);
+    }
+  }
+}
 Future loginDialog(BuildContext context) {
   return showDialog(
     context: context,
@@ -22,6 +90,7 @@ class LoginDialog extends StatefulWidget {
   State<LoginDialog> createState() => _LoginDialogState();
 }
 class _LoginDialogState extends State<LoginDialog> {
+  final _formKey = GlobalKey<FormState>();
   final persistenceProvider =
       Provider.of<PersistenceProvider>(AppConstant.globalNavigatorKey.currentContext!);
   late FocusNode _focusNode;
@@ -48,43 +117,45 @@ class _LoginDialogState extends State<LoginDialog> {
               margin: const EdgeInsets.all(20),
               child: Card(
                 child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: TextFormField(
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                          decoration: const InputDecoration(
-                            border: OutlineInputBorder(),
-                            labelText: '$columnName ?',
-                          ),
-                          focusNode: _focusNode,
-                          onFieldSubmitted: (name) {
-                            final focusScope = FocusScope.of(context);
-                            if ((persistenceProvider.userMap.containsKey(name) && 
-                              persistenceProvider.userMap[name]!.aktiv != 0))
-                            {
-                              persistenceProvider.setUser(name);
-                              if (mess != null) {
-                                message(mess!);
-                                // await Future.delayed(const Duration(seconds: 2));
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: FormTextField(
+                            '$columnName ?', null,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                            focusNode: _focusNode,
+                            onFieldSubmitted: (name) {
+                              if (_formKey.currentState!.validate()) {
+                                persistenceProvider.setUser(name);
+                                message();
+                                Navigator.of(context).pop();
                               }
-                              Navigator.of(context).pop();
-                            } else {
-                              focusScope.requestFocus(_focusNode);
-                            }
-                          },
+                              FocusScope.of(context).requestFocus(_focusNode);
+                            },
+                            validator: (value) {
+                              if (value == null || value.isEmpty || value == 'sys') {
+                                return 'Bitte einen gültigen Benutzernamen angeben';
+                              }
+                              if (!Persistor.userMap.containsKey(value) || Persistor.userMap[value]!.aktiv == 0) {
+                                return "Dieser Benutzername ist ungültig";
+                              }
+                              return null;
+                            },
+                          ),
                         ),
-                      ),
-                      Image.asset('assets/images/gemuese.png',
-                        width: 200,
-                        height: 200,
-                        fit: BoxFit.cover,
-                      ),
-                      // const MyImage(assetImage: AssetImage('assets/images/gemuese.png')),
-                    ],
+                        Image.asset('assets/images/gemuese.png',
+                          width: 200,
+                          height: 200,
+                          fit: BoxFit.cover,
+                        ),
+                        // const MyImage(assetImage: AssetImage('assets/images/gemuese.png')),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -135,4 +206,94 @@ Future<bool?> confirmation(BuildContext context, {Cause cause = Cause.delete, bo
       ],
     ),
   );
+}
+class MengeAnteil extends StatefulWidget {
+  final TextEditingController anteileController;
+  final TextEditingController mengeController;
+  const MengeAnteil({super.key, required this.anteileController, required this.mengeController});
+  static num anteile = 1;
+  static Future<num?> anteilung(BuildContext context, TextEditingController controller, num? menge) async {
+    return showDialog<num>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: const Text('Anzahl der $columnAnteile'),
+        content: FormTextField(
+          columnAnteile,
+          controller,
+          autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp('[0-9.,]')),
+          ],
+          onFieldSubmitted: (value) {
+            num? mengeProAnteil;
+            if (menge != null) {
+              try {
+                anteile = max(1, mengeFormat.parse(value));
+              } catch (e) {
+                anteile = 1;
+              }
+              mengeProAnteil = menge / anteile;
+            }
+            Navigator.pop(context, mengeProAnteil);
+          },
+        ),
+      )
+    );
+  }
+  @override
+  State<MengeAnteil> createState() => _MengeAnteilState();
+}
+class _MengeAnteilState extends State<MengeAnteil> {
+  num? mengeProAnteil;
+  num menge() {
+    try {
+      return mengeFormat.parse(widget.mengeController.text);
+    } catch (e) {
+      return 0;
+    }
+  }
+  @override
+  void didChangeDependencies() {
+    mengeProAnteil = menge() / MengeAnteil.anteile;
+    super.didChangeDependencies();
+  }
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        SizedBox(
+          width: 100,
+          child: FormTextField(
+            columnMenge,
+            widget.mengeController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp('[0-9.,]')),
+            ],
+            onChanged: (value) {
+              setState(() {
+                mengeProAnteil = menge() / MengeAnteil.anteile;
+              });
+            },
+          ),
+        ),
+        Text('pro Anteil: ${mengeFormat.format(mengeProAnteil ?? 0)}'),
+        IconButton(
+          onPressed: () async {
+            var mpA = 
+              await MengeAnteil.anteilung(context, 
+                widget.anteileController, 
+                menge()
+              );
+            setState(() {
+              mengeProAnteil = mpA;
+            });
+          },
+          icon: const Icon(Icons.widgets),
+        ),
+      ],
+    );
+  }
 }

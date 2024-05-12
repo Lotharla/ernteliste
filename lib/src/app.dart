@@ -1,5 +1,5 @@
 import 'package:ernteliste/src/app_constant.dart';
-import 'package:ernteliste/src/table/tables_page.dart';
+import 'package:ernteliste/src/tables/tables_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';

@@ -1,3 +1,4 @@
+
 import 'package:ernteliste/src/kw_feature/kw_model.dart';
 import 'package:flutter/foundation.dart';
 import 'package:server/tables.dart';
@@ -23,7 +24,7 @@ class PersistenceProvider extends ChangeNotifier {
     } else {
       switch (table) {
         case tableUser:
-          return userMap.values.toList();
+          return Persistor.userMap.values.toList();
         case tableErtrag:
           return ertragList;
         default:
@@ -50,25 +51,19 @@ class PersistenceProvider extends ChangeNotifier {
     }
     return -1;
   }
-  Map<String,User> userMap = {};
   Future<void> users() async {
-    List records = await Persistor.perform('query', path: tableUser);
-    userMap = {};
-    for (var r in records) {
-      userMap[r[columnName]] = User.from(r);
-    }
+    await Persistor.users();
     _propagateChange();
   }
-  String userName = '';
   void setUser(name) {
-    userName = name;
+    Persistor.userName = name;
     Persistor.userAdmin = userIsAdmin();
     _propagateChange();
   }
   bool userIsAdmin({String? name}) {
-    name = name ?? userName;
-    if (userMap.containsKey(name)) {
-      return userMap[name]!.funktion == 'admin';
+    name = name ?? Persistor.userName;
+    if (Persistor.userMap.containsKey(name)) {
+      return Persistor.userMap[name]!.funktion.toLowerCase() == 'admin';
     } else {
       return false;
     }
@@ -82,7 +77,7 @@ class PersistenceProvider extends ChangeNotifier {
     setLogging();
     isLoading = true;
     await setDatabase();
-    for (String name in [tableKulturen, tableEinheiten]) {
+    for (String name in [tableKulturen, tableEinheiten, tableUser]) {
       await setupTable(name);
     }
     if (cnt != null) {
@@ -101,6 +96,9 @@ class PersistenceProvider extends ChangeNotifier {
   }
   Future<void> copyErtraege(String kw1, String kw2) async {
     List records = await Persistor.perform('query', kws: [kw2]) as List;
+    if (records.isEmpty) {
+      return;
+    }
     for (var rec in records) {
       rec[columnKw] = kw1;
     }

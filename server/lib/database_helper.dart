@@ -4,7 +4,7 @@ import 'tables.dart';
 bool verbose = false;
 
 class DatabaseHelper extends SqfliteHelper {
-  static const _databaseVersion = 2;
+  static const _databaseVersion = 4;
   
   DatabaseHelper([String file = '']) {
     init(file);
@@ -17,10 +17,10 @@ class DatabaseHelper extends SqfliteHelper {
     await db.execute('PRAGMA foreign_keys = OFF');
   }
   // this opens the database (and creates it if it doesn't exist)
-  Future<Database?> open([bool empty = false]) async {
+  Future<Database?> open([bool clear = false]) async {
     if (_db != null && keep) return _db;
     String path = await databasePath();
-    if (empty) {
+    if (clear) {
       await deleteDatabase(path);
     }
     _db = await openDatabase(
@@ -32,6 +32,12 @@ class DatabaseHelper extends SqfliteHelper {
         var batch = db.batch();
         if (oldVersion == 1) {
           _updateTableErtragV1toV2(batch);
+        }
+        if (oldVersion <= 2) {
+          _updateTableErtragV2toV3(batch);
+        }
+        if (oldVersion <= 3) {
+          _updateTableErtragV3toV4(batch);
         }
         await batch.commit();
       },
@@ -46,11 +52,9 @@ class DatabaseHelper extends SqfliteHelper {
       CREATE TABLE $tableUser (
         $columnName TEXT UNIQUE,
         $columnFunktion TEXT,
-        $columnAktiv INTEGER NOT NULL CHECK ($columnAktiv IN (0,1))
+        $columnAktiv INTEGER NOT NULL CHECK ($columnAktiv IN (0,1)),
+        $columnEinst TEXT
       )
-      ''');
-    await db.execute('''
-      INSERT INTO $tableUser ($columnName, $columnFunktion, $columnAktiv) VALUES ('dev', 'admin', 1)
       ''');
     await db.execute('''
       CREATE TABLE $tableKulturen (
@@ -58,6 +62,7 @@ class DatabaseHelper extends SqfliteHelper {
         $columnSorte TEXT,
         $columnKuerzel TEXT,
         $columnAktiv INTEGER NOT NULL CHECK ($columnAktiv IN (0,1)),
+        $columnFarbe TEXT,
         UNIQUE($columnArt,$columnSorte,$columnKuerzel)
       )
       ''');
@@ -72,6 +77,7 @@ class DatabaseHelper extends SqfliteHelper {
         $columnKultur TEXT,
         $columnSatz INTEGER,
         $columnMenge REAL,
+        $columnAnteile REAL,
         $columnEinheit TEXT,
         $columnBemerkungen TEXT,
         $columnName TEXT
@@ -81,6 +87,19 @@ class DatabaseHelper extends SqfliteHelper {
   void _updateTableErtragV1toV2(Batch batch) {
     batch.execute('''
       ALTER TABLE $tableErtrag ADD COLUMN $columnSatz INTEGER
+      ''');
+  }
+  void _updateTableErtragV2toV3(Batch batch) {
+    batch.execute('''
+      ALTER TABLE $tableKulturen ADD COLUMN $columnFarbe TEXT
+      ''');
+    batch.execute('''
+      ALTER TABLE $tableUser ADD COLUMN $columnEinst TEXT
+      ''');
+  }
+  void _updateTableErtragV3toV4(Batch batch) {
+    batch.execute('''
+      ALTER TABLE $tableErtrag ADD COLUMN $columnAnteile REAL
       ''');
   }
 

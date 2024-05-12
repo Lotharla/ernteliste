@@ -20,6 +20,7 @@ dependencies:
   universal_platform: ^1.0.0+1
   characters:
   intl:
+  date_checker: ^1.0.0
 
 dev_dependencies:
   lints: ^2.0.0

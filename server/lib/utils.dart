@@ -133,6 +133,7 @@ Future<List<Map<String, dynamic>>> loadRecords(String? path,
             value = i < line.length ? int.tryParse(trimCsvElement(line[i])) : columnAktivDefault;
             break;
           case columnMenge:
+          case columnAnteile:
             value = i < line.length ? double.tryParse(trimCsvElement(line[i])): columnMengeDefault;
             break;
           default:
@@ -187,13 +188,14 @@ Future<Ertrag> randomErtrag(
     woy = woy ?? 1+rnd.nextInt(refDay(year).weekOfYear);
   }
   var menge = 1+rnd.nextInt(100);
+  var anteile = 1+rnd.nextInt(10);
   var bemerkungen = testing ? '' : await placeholderString(rnd);
   var name = '';
   Ertrag ertrag = Ertrag(
     '$year-${woyString(woy)}', 
     kulturen[rnd.nextInt(kulturen.length)],
     1 + rnd.nextInt(9),
-    menge, 
+    menge, anteile,
     einheiten[rnd.nextInt(einheiten.length)], 
     bemerkungen,
     name

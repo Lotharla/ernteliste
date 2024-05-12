@@ -1,31 +1,32 @@
 import 'package:calendar_date_picker2/calendar_date_picker2.dart';
+import 'package:ernteliste/apps/navigating.dart';
 import 'package:ernteliste/src/app_constant.dart';
 import 'package:ernteliste/src/ertrag_feature/ertrag_form.dart';
 import 'package:ernteliste/src/kw_feature/kw_model.dart';
 import 'package:ernteliste/src/misc.dart';
+import 'package:ernteliste/src/navigation_service.dart';
 import 'package:ernteliste/src/persistence/persistence_provider.dart';
+import 'package:ernteliste/src/persistence/persistor.dart';
 import 'package:ernteliste/src/settings/settings_controller.dart';
 import 'package:ernteliste/src/settings/settings_service.dart';
 import 'package:ernteliste/src/settings/settings_view.dart';
-import 'package:ernteliste/src/table/table_dialogs.dart';
+import 'package:ernteliste/src/tables/table_dialogs.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:server/tables.dart';
 import 'package:week_of_year/week_of_year.dart';
 
-import 'package:ernteliste/src/persistence/persistor.dart';
-
 final persistenceProvider = PersistenceProvider();
-// late List _bemerkungen;
+final settingsController = SettingsController(SettingsService());
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await persistenceProvider.persistenceCheck(cnt: 5);
-  // _bemerkungen = await persistenceProvider.fetch(columnBemerkungen);
-  runApp(const MyApp());
+  await settingsController.loadSettings();
+  runApp(const WidgetsApp());
 }
-class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+class WidgetsApp extends StatelessWidget {
+  const WidgetsApp({Key? key}) : super(key: key);
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
@@ -33,32 +34,30 @@ class MyApp extends StatelessWidget {
       child: MaterialApp(
           debugShowCheckedModeBanner: false, 
           navigatorKey: AppConstant.globalNavigatorKey,
-          home: const DialogScreen(),
+          home: const WidgetsScreen(),
         ),
     );
   }
 }
-class DialogScreen extends StatefulWidget {
-  const DialogScreen({super.key});
+class WidgetsScreen extends StatefulWidget {
+  const WidgetsScreen({super.key});
   @override
-  State<DialogScreen> createState() => _DialogScreenState();
+  State<WidgetsScreen> createState() => _WidgetsScreenState();
 }
-class _DialogScreenState extends State<DialogScreen> {
+class _WidgetsScreenState extends State<WidgetsScreen> {
   DateTime _selectedDate = DateTime.now();
-  late Future<List> einheiten, kulturen, bemerkungen;
+  late Future<List> bemerkungen;
   @override
   void initState() {
     super.initState();
-    // WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
-    //   loginDialog(context);
-    // });
+    WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+      loginDialog(context);
+    });
     Persistor.userAdmin = true;
   }
   @override
   void didChangeDependencies() {
     bemerkungen = persistenceProvider.fetch(columnBemerkungen);
-    einheiten = persistenceProvider.fetch(tableEinheiten);
-    kulturen = persistenceProvider.fetch(tableKulturen, where: rowAktiv());
     super.didChangeDependencies();
   }
   @override
@@ -69,7 +68,7 @@ class _DialogScreenState extends State<DialogScreen> {
         title: const Text("Widgets"),
         actions: [
           IconButton(
-            icon: const Icon(Icons.calendar_view_month),
+            icon: const Icon(Icons.calendar_today),
             tooltip: 'Jahr bestimmen',
             onPressed: () => yearPicker(context),
             // onPressed: () async {
@@ -105,69 +104,89 @@ class _DialogScreenState extends State<DialogScreen> {
             }, 
             icon: const Icon(Icons.filter_list),
           ),
+          IconButton(
+            onPressed: () async {
+              NavigationService().navigateToScreen(const NavigatingPage());
+            }, 
+            icon: const Icon(Icons.beach_access),
+          ),
         ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(12.0),
-        child: Column(children: [
-          ElevatedButton(
-            onPressed: () async {
-              final result = (await Navigator.push(
-                context,
-                MaterialPageRoute<DateTime>(builder: (context) => DatePicker(initialDate: _selectedDate)),
-              ))!;
-              setState(() {
-                _selectedDate = result;
-              });
-            },
-            child: Text(_selectedDate.toString().split(' ').first),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final values = await showCalendarDatePicker2Dialog(
-                context: context,
-                config: CalendarDatePicker2WithActionButtonsConfig(
-                  weekNumbers: true,
-                  weekNumberLabel: 'Kw',
-                  weekNumberTextStyle: const TextStyle(
-                    color: Colors.redAccent,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                dialogSize: const Size(400, 400),
-                borderRadius: BorderRadius.circular(15),
-                value: [_selectedDate],
-                dialogBackgroundColor: Colors.white,
-              );
-              if (values != null) {
+        child: SingleChildScrollView(
+          child: Column(children: [
+            ElevatedButton(
+              onPressed: () async {
+                final result = (await Navigator.push(
+                  context,
+                  MaterialPageRoute<DateTime>(builder: (context) => DatePicker(initialDate: _selectedDate)),
+                ))!;
                 setState(() {
-                  _selectedDate = values[0]!;
+                  _selectedDate = result;
                 });
-              }
-            },
-            child: Text('Kw ${_selectedDate.weekOfYear}'),
-          ),
-          YearPickerWidget(updateYear: SettingsController(SettingsService()).updateYear),
-          ElevatedButton(
-            onPressed: () async {
-              Map data = {'Wer': 'dev', 'Funktion': 'admin', 'aktiv': 1};
-              var result = await showDialog(
-                context: context, 
-                builder: (BuildContext context) => TableRowDialog(table: tableUser, row: data),
-              );
-              debugPrint(result);
-              debugPrint(data.toString());
-            },
-            child: const Text('TableRowDialog'),
-          ),
-          FutureListComposite(
-            name: columnBemerkungen,
-            list: bemerkungen, 
-            controller: TextEditingController(text: 'bla'),
-          ),
-          FormTextField('label', TextEditingController(text: 'xxx')),
-          TextFormField(controller: TextEditingController(text: 'xyz')),
-        ]),
+              },
+              child: Text(_selectedDate.toString().split(' ').first),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final values = await showCalendarDatePicker2Dialog(
+                  context: context,
+                  config: CalendarDatePicker2WithActionButtonsConfig(
+                    weekNumbers: true,
+                    weekNumberLabel: 'Kw',
+                    weekNumberTextStyle: const TextStyle(
+                      color: Colors.redAccent,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  dialogSize: const Size(400, 400),
+                  borderRadius: BorderRadius.circular(15),
+                  value: [_selectedDate],
+                  dialogBackgroundColor: Colors.white,
+                );
+                if (values != null) {
+                  setState(() {
+                    _selectedDate = values[0]!;
+                  });
+                }
+              },
+              child: Text('Kw ${_selectedDate.weekOfYear}'),
+            ),
+            YearPickerWidget(updateYear: SettingsController(SettingsService()).updateYear),
+            ElevatedButton(
+              onPressed: () async {
+                Map data = {'Wer': 'dev', 'Funktion': 'admin', 'aktiv': 1};
+                var result = await showDialog(
+                  context: context, 
+                  builder: (BuildContext context) => TableRowDialog(table: tableUser, row: data),
+                );
+                debugPrint(result);
+                debugPrint(data.toString());
+              },
+              child: const Text('TableRowDialog'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                num? mengeProAnteil = 
+                  await MengeAnteil.anteilung(context, TextEditingController(text: '${MengeAnteil.anteile}'), 10);
+                debugPrint('mengeProAnteil: $mengeProAnteil');
+              },
+              child: const Text('Anteile'),
+            ),
+            MengeAnteil(
+              anteileController: TextEditingController(text: '${MengeAnteil.anteile}'), 
+              mengeController: TextEditingController(text: '10')
+            ),
+            FutureListComposite(
+              name: columnBemerkungen,
+              list: bemerkungen, 
+              controller: TextEditingController(text: 'bla'),
+            ),
+            FormTextField('label', TextEditingController(text: 'xxx')),
+            TextFormField(controller: TextEditingController(text: 'xyz')),
+          ]),
+        ),
       ),
     );
   }

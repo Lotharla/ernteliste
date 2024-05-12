@@ -6,18 +6,17 @@
 
 // ignore_for_file: avoid_print, curly_braces_in_flow_control_structures
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:ernteliste/src/persistence/persistence_provider.dart';
 import 'package:ernteliste/src/persistence/persistor.dart';
+import 'package:ernteliste/src/settings/settings_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:server/database_helper.dart';
 import 'package:server/tables.dart';
 import 'package:server/utils.dart';
-import 'package:week_of_year/week_of_year.dart';
-import 'package:date_checker/date_checker.dart';
-import 'package:intl/intl.dart';
 
 dynamic dbFile;
 Future<void> checkServer(bool shouldBeAvailable) async {
@@ -44,31 +43,10 @@ void main() {
   });
 
   group('Verschiedenes', () {
-    test('DateTime.weekOfYear', () {
-      final today = DateTime.now();
-      print(today.weekOfYear); // Get the iso week of year
-      print(today.ordinalDate); // Get the ordinal today
-      print(today.isLeapYear); // Is this a leap year?
-      print(DateFormat("y-MM-dd").format(today));
-
-      final DateTime dateFromWeekNumber = dateTimeFromWeekNumber(today.year, today.weekOfYear, today.weekday);
-      expect(
-        DateFormat("yyyy-MM-dd").format(dateFromWeekNumber), 
-        DateFormat("yyyy-MM-dd").format(today));
-
-      print('weekStart : ${weekStart(date: today)}');
-      print('weekEnd : ${weekEnd(date: today)}');
-      print('weekOfYear 01/04 : ${DateTime(today.year, 1, 4).weekOfYear}');
-      print('weekOfYear 12/28 : ${DateTime(today.year, 12, 28).weekOfYear}');
-      var dateTime = DateTime(2020, 12, 28);
-      expect(dateTime.weekOfYear, 53);
-      var add = dateTime.add(const Duration(days: 4));
-      expect(add.weekOfYear, 53);
-    });
     test('Persistor', () async {
       var kwMap = await Persistor.kwErtragMap();
       var dbfile = dbFile;
-      await checkServer(false);
+      Persistor.serverAvailable = false;
       DatabaseHelper databaseHelper = DatabaseHelper(dbfile.toString());
       var db = await databaseHelper.open();
       expect(db, isNotNull);
@@ -76,7 +54,7 @@ void main() {
       expect(results.length, kwMap.length);
       await db.close();
       Object? result = await Persistor.perform('insert', 
-        data: Ertrag(weekOfYear(), 'Riesenkürbis', 3, 1, 'Stück', '', '').record
+        data: Ertrag(weekOfYear(), 'Riesenkürbis', 3, 1, 2, 'Stück', '', '').record
       );
       final ids = (result! as Map)[columnId];
       for (var id in ids) {
@@ -99,13 +77,34 @@ void main() {
       expect(persistenceProvider.kwMap.length, 1);
       expect(persistenceProvider.kwMap[woy]!.length, cnt);
       var woy2 = weekOfYear(plus: 1);
-      await persistenceProvider.copyErtraege(woy, woy2);
+      await persistenceProvider.copyErtraege(woy2, woy);
       await persistenceProvider.kwErtraege(woy2);
       expect(persistenceProvider.ertragList.length, cnt);
       await persistenceProvider.kwErtragMap();
       expect(persistenceProvider.kwMap.length, 2);
       expect(persistenceProvider.kwMap[woy2]!.length, cnt);
-      await persistenceProvider.fetch(columnBemerkungen);
+      List results = await persistenceProvider.fetch(columnBemerkungen);
+      var len = results.length;
+      expect(len > 0 && len <= cnt, true);
+    });
+    test('User settings', () async {
+      Persistor.serverAvailable = false;
+      PersistenceProvider persistenceProvider = PersistenceProvider();
+      await setupTable(tableUser);
+      await Persistor.users();
+      persistenceProvider.rows = Persistor.userMap.values.toList();
+      expect(persistenceProvider.column(columnName).contains('sys'), true);
+      expect(persistenceProvider.column(columnFunktion).contains('admin'), true);
+      persistenceProvider.setUser('usr');
+      final settingsService = SettingsService();
+      expect(await settingsService.themeMode(), ThemeMode.system);
+      await settingsService.updateThemeMode(ThemeMode.dark);
+      expect(await settingsService.themeMode(), ThemeMode.dark);
+      Persistor.userMap.forEach((key, user) {
+        if (key == 'usr') {
+          expect((jsonDecode(user.einstellungen) as Map).containsValue('dark'), true);
+        }
+      });
     });
     test('Setup', () async {
       for (var serverAvailable in [false, true]) {
@@ -118,6 +117,7 @@ void main() {
             await setupTable(name);
           }
           count[name] = await Persistor.perform('count', path: tablePath(name));
+          expect(count[name], isPositive);
           if (!Persistor.serverAvailable) {
             expect(count[name], (await defaultRecords(name)).length);
           }

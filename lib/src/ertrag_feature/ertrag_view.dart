@@ -115,10 +115,7 @@ class _KwErtragViewState extends State<KwErtragView> {
 Future<Object?> navigateToErtragForm(BuildContext context, Map record) async {
   return Navigator.pushNamed(context, 
     ErtragForm.routeName,
-    arguments: {
-      'record': record,
-      // 'updater': updateSelection,
-    },
+    arguments: record,
   );
 }
 class ErtragListView extends StatelessWidget {

@@ -2,7 +2,7 @@ import 'package:ernteliste/src/persistence/persistor.dart';
 import 'package:ernteliste/src/settings/settings_controller.dart';
 import 'package:ernteliste/src/settings/settings_service.dart';
 import 'package:ernteliste/src/settings/settings_view.dart';
-import 'package:ernteliste/src/table/tables_page.dart';
+import 'package:ernteliste/src/tables/tables_page.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:ernteliste/src/navigation_service.dart';
@@ -16,17 +16,17 @@ import 'package:server/utils.dart';
 final persistenceProvider = PersistenceProvider();
 final settingsController = SettingsController(SettingsService());
 
-Future<MyApp> main() async {
+Future<NavigatingApp> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await persistenceProvider.persistenceCheck();
   await settingsController.loadSettings();
-  var myApp = MyApp(settingsController: settingsController);
+  var myApp = NavigatingApp(settingsController: settingsController);
   runApp(myApp);
   return myApp;
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({
+class NavigatingApp extends StatelessWidget {
+  const NavigatingApp({
     super.key,
     required this.settingsController,
   });
@@ -46,7 +46,7 @@ class MyApp extends StatelessWidget {
             //   colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
             //   useMaterial3: true,
             // ),
-            home: const MyHomePage(),
+            home: const NavigatingPage(),
             routes: {
               KwListView.routeName: (context) => const KwListView(),
               KwErtragView.routeName: (context) => const KwErtragView(title: 'Kw'),
@@ -60,14 +60,14 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key});
+class NavigatingPage extends StatefulWidget {
+  const NavigatingPage({super.key});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<NavigatingPage> createState() => _NavigatingPageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class _NavigatingPageState extends State<NavigatingPage> {
   int _counter = 0;
   void _incrementCounter() {
     setState(() {
@@ -123,8 +123,8 @@ class _MyHomePageState extends State<MyHomePage> {
                   context,
                   const ErtragForm(),
                   arguments: len < 1 
-                    ? {'record': {columnKw: kw}} 
-                    : {'record': persistenceProvider.ertragList[len-1].record}
+                    ? {columnKw: kw}
+                    : persistenceProvider.ertragList[len-1].record
                 );
               },
               child: const Text("ErtragForm"),
@@ -160,8 +160,8 @@ class _MyHomePageState extends State<MyHomePage> {
         builder: (context) => const ErtragForm(),
         settings: RouteSettings(
           arguments: len < 1 
-            ? {'record': {columnKw: kw}} 
-            : {'record': persistenceProvider.ertragList[len-1].record}
+            ? {columnKw: kw}
+            : persistenceProvider.ertragList[len-1].record
         ),
       ),
     );

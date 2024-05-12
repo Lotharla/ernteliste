@@ -60,9 +60,9 @@ class _KwListViewState extends State<KwListView> {
                 if (values != null && values.isNotEmpty) {
                   final selectedDate = values[0]!;
                   KwModel.refTime.value = selectedDate;
-                  await _scrollToIndex(selectedDate.weekOfYear);
                   if (!context.mounted) return;
                   navigateToErtragView(context, KwModel(selectedDate.weekOfYear, selectedDate.year));
+                  await _scrollToIndex(selectedDate.weekOfYear);
                 }
               },
             ),

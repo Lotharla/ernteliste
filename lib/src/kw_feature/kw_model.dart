@@ -5,7 +5,6 @@ import 'package:server/utils.dart';
 import 'package:week_of_year/week_of_year.dart';
 import 'package:date_checker/date_checker.dart';
 
-/// A placeholder class that represents an entity or model.
 class KwModel {
   final int woy;
   final int year;

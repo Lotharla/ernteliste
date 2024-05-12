@@ -7,9 +7,8 @@ import 'package:ernteliste/src/app_constant.dart';
 import 'package:server/tables.dart';
 import 'package:provider/provider.dart';
 import 'package:ernteliste/src/persistence/persistence_provider.dart';
+import 'package:ernteliste/src/persistence/persistor.dart';
 import 'package:server/utils.dart';
-
-import '../persistence/persistor.dart';
 
 class ErtragForm extends StatefulWidget {
   const ErtragForm({super.key, this.title});
@@ -44,8 +43,8 @@ class _ErtragFormState extends State<ErtragForm> {
     super.dispose();
   }
   Map args = {};
-  bool get ertragNew => args['record'][columnId] == null;
-  get kw => kwString(args['record'][columnKw] ?? weekOfYear());
+  bool get ertragNew => args[columnId] == null;
+  get kw => kwString(args[columnKw] ?? weekOfYear());
   String ertragTitle() {
     if (ertragNew) {
       return 'Neuer Ertrag in $kw';
@@ -65,12 +64,11 @@ class _ErtragFormState extends State<ErtragForm> {
       }
       if (!ertragNew || confirmed) {
         for(String col in columns[tableErtrag]!) {
-          args['record'][col] = col == columnMenge
+          args[col] = [columnMenge, columnAnteile].contains(col)
             ? mengeFormat.parse(controllers[col]!.text) 
             : controllers[col]!.text;
         }
-        await persistenceProvider.upsert(args['record']);
-        // args['updater']();
+        await persistenceProvider.upsert(args);
       }
     }
   }
@@ -82,8 +80,10 @@ class _ErtragFormState extends State<ErtragForm> {
     if (args.isEmpty && widget.title == null) {
       args = (ModalRoute.of(context)!.settings.arguments ?? args) as Map;
       for(String col in columns[tableErtrag]!) {
-        var val = args['record'][col] ?? (col == columnMenge? 0 : '');
-        controllers[col]!.text = col == columnMenge? mengeFormat.format(val) : val.toString();
+        var val = args[col] ?? (col == columnMenge ? 0 : (col == columnAnteile ? 1 : ''));
+        controllers[col]!.text = [columnMenge, columnAnteile].contains(col) 
+          ? mengeFormat.format(val) 
+          : val.toString();
       }
     }
     return Consumer<PersistenceProvider>(
@@ -119,13 +119,9 @@ class _ErtragFormState extends State<ErtragForm> {
                       FilteringTextInputFormatter.allow(RegExp('[1-9]')),
                     ],
                   ),
-                  FormTextField(
-                    columnMenge,
-                    controllers[columnMenge]!,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp('[0-9.,]')),
-                    ],
+                  MengeAnteil(
+                    anteileController: controllers[columnAnteile]!, 
+                    mengeController: controllers[columnMenge]!
                   ),
                   FormTextField(
                     columnEinheit,
@@ -152,53 +148,6 @@ class _ErtragFormState extends State<ErtragForm> {
           ),
         );
       }
-    );
-  }
-}
-class FormTextField extends StatelessWidget {
-  final String label;
-  final TextEditingController controller;
-  final TextInputType? keyboardType;
-  final List<TextInputFormatter>? inputFormatters;
-  final FocusNode? focusNode;
-  final int? maxLines;
-  final Function(String)? onChanged;
-  final Function(String)? onFieldSubmitted;
-  final String? initialValue;
-  final bool readOnly;
-  final String? Function(String?)? validator;
-  const FormTextField(this.label, this.controller, {
-    this.keyboardType, 
-    this.inputFormatters,
-    this.focusNode,
-    this.maxLines = 1,
-    this.onChanged,
-    this.onFieldSubmitted,
-    this.initialValue,
-    this.readOnly = false,
-    this.validator,
-    super.key
-  });
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: TextFormField(
-        controller: controller,
-        decoration: InputDecoration(
-          border: const OutlineInputBorder(),
-          labelText: label,
-        ),
-        keyboardType: keyboardType,
-        inputFormatters: inputFormatters,
-        focusNode: focusNode,
-        maxLines: maxLines,
-        onChanged: onChanged,
-        onFieldSubmitted: onFieldSubmitted,
-        initialValue: initialValue,
-        readOnly: readOnly,
-        validator: validator,
-      ),
     );
   }
 }
@@ -440,6 +389,49 @@ class _SelectableButtonState extends State<SelectableButton> {
       ),
       onPressed: widget.onPressed,
       child: widget.child,
+    );
+  }
+}
+class PopupDialogComposite extends StatelessWidget {
+  final String label;
+  final Widget Function(BuildContext) dialog;
+  final TextEditingController controller;
+  final String separator;
+  final FocusNode? focusNode;
+  final String? Function(String?)? validator;
+  const PopupDialogComposite({super.key, 
+    required this.label, required this.dialog, required this.controller,
+    this.separator = '',
+    this.focusNode, this.validator,
+  });
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 15,
+        vertical: 15,
+      ),
+      decoration: BoxDecoration(
+        border: Border.all(),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      width: MediaQuery.of(context).size.width,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          const Text(
+            '{_selected.year}',
+          ),
+          GestureDetector(
+            onTap: () {
+              MengeAnteil.anteilung(context, controller, 10);
+            },
+            child: const Icon(
+              Icons.calendar_month,
+            ),
+          )
+        ],
+      ),
     );
   }
 }
