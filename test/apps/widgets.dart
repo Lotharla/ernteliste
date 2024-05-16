@@ -169,7 +169,9 @@ class _WidgetsScreenState extends State<WidgetsScreen> {
             ElevatedButton(
               onPressed: () async {
                 num? mengeProAnteil = 
-                  await MengeAnteil.anteilung(context, TextEditingController(text: '${MengeAnteil.anteile}'), 10);
+                  await MengeAnteil.anteilung(context, 
+                    TextEditingController(text: '${MengeAnteil.anteile}'), 
+                    menge: 10);
                 debugPrint('mengeProAnteil: $mengeProAnteil');
               },
               child: const Text('Anteile'),

@@ -266,25 +266,35 @@ class Persistor {
     }
   }
   static String userName = '';
-  static Map settings() => jsonDecode(userMap[userName]!.einstellungen) as Map;
-  static getUserSetting(name) {
-    if (userName.isEmpty) {
+  static const String sysName = 'sys';
+  static String name(bool sys) => sys ? sysName : userName;
+  static Map settings(bool sys) => jsonDecode(userMap[name(sys)]!.einstellungen) as Map;
+  static getUserSetting(key, {bool sys = false}) async {
+    if (name(sys).isEmpty) {
       return null;
     }
-    return settings()[name];
+    await users();
+    return settings(sys)[key];
   }
-  static putUserSetting(name, value) async {
-    if (userName.isNotEmpty) {
-      Map einstellungen = settings();
-      einstellungen[name] = value;
-      var data = userMap[userName]!.record;
+  static putUserSetting(key, value, {bool sys = false}) async {
+    if (name(sys).isNotEmpty) {
+      Map einstellungen = settings(sys);
+      einstellungen[key] = value;
+      var data = userMap[name(sys)]!.record;
       data[columnEinst] = jsonEncode(einstellungen);
       await Persistor.perform('update', 
         data: data, 
-        ids: [userMap[userName]!.id], 
+        ids: [userMap[name(sys)]!.id], 
         path: tableUser,
       );
       await users();
+    }
+  }
+  static Future<void> prepare() async {
+    setLogging();
+    await setDatabase();
+    for (String name in [tableKulturen, tableEinheiten, tableUser]) {
+      await setupTable(name);
     }
   }
 }

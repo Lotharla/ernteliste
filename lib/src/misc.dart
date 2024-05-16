@@ -138,7 +138,7 @@ class _LoginDialogState extends State<LoginDialog> {
                               FocusScope.of(context).requestFocus(_focusNode);
                             },
                             validator: (value) {
-                              if (value == null || value.isEmpty || value == 'sys') {
+                              if (value == null || value.isEmpty || value == Persistor.sysName) {
                                 return 'Bitte einen gültigen Benutzernamen angeben';
                               }
                               if (!Persistor.userMap.containsKey(value) || Persistor.userMap[value]!.aktiv == 0) {
@@ -208,11 +208,9 @@ Future<bool?> confirmation(BuildContext context, {Cause cause = Cause.delete, bo
   );
 }
 class MengeAnteil extends StatefulWidget {
-  final TextEditingController anteileController;
-  final TextEditingController mengeController;
-  const MengeAnteil({super.key, required this.anteileController, required this.mengeController});
-  static num anteile = 1;
-  static Future<num?> anteilung(BuildContext context, TextEditingController controller, num? menge) async {
+  static ValueNotifier<num> anteile = ValueNotifier<num>(1);
+  static String proAnteil(num value) => 'pro Anteil: ${mengeFormat.format(value)}';
+  static Future<num?> anteilung(BuildContext context, TextEditingController controller, {num? menge}) async {
     return showDialog<num>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
@@ -229,11 +227,11 @@ class MengeAnteil extends StatefulWidget {
             num? mengeProAnteil;
             if (menge != null) {
               try {
-                anteile = max(1, mengeFormat.parse(value));
+                anteile.value = max(1, mengeFormat.parse(value));
               } catch (e) {
-                anteile = 1;
+                anteile.value = 1;
               }
-              mengeProAnteil = menge / anteile;
+              mengeProAnteil = menge / anteile.value;
             }
             Navigator.pop(context, mengeProAnteil);
           },
@@ -241,21 +239,42 @@ class MengeAnteil extends StatefulWidget {
       )
     );
   }
+  final TextEditingController anteileController;
+  final TextEditingController mengeController;
+  const MengeAnteil({super.key, required this.anteileController, required this.mengeController});
   @override
   State<MengeAnteil> createState() => _MengeAnteilState();
 }
 class _MengeAnteilState extends State<MengeAnteil> {
-  num? mengeProAnteil;
-  num menge() {
+  late num mengeProAnteil;
+  late FocusNode focusNode;
+  @override
+  void initState() {
+    focusNode = FocusNode();
+    super.initState();
+  }
+  @override
+  void dispose() {
+    focusNode.dispose();
+    super.dispose();
+  }
+  num get menge {
     try {
       return mengeFormat.parse(widget.mengeController.text);
     } catch (e) {
       return 0;
     }
   }
+  num get anteile {
+    try {
+      return mengeFormat.parse(widget.anteileController.text);
+    } catch (e) {
+      return MengeAnteil.anteile.value;
+    }
+  }
   @override
   void didChangeDependencies() {
-    mengeProAnteil = menge() / MengeAnteil.anteile;
+    mengeProAnteil = menge / anteile;
     super.didChangeDependencies();
   }
   @override
@@ -274,26 +293,62 @@ class _MengeAnteilState extends State<MengeAnteil> {
             ],
             onChanged: (value) {
               setState(() {
-                mengeProAnteil = menge() / MengeAnteil.anteile;
+                mengeProAnteil = menge / anteile;
               });
             },
           ),
         ),
-        Text('pro Anteil: ${mengeFormat.format(mengeProAnteil ?? 0)}'),
-        IconButton(
-          onPressed: () async {
-            var mpA = 
-              await MengeAnteil.anteilung(context, 
-                widget.anteileController, 
-                menge()
-              );
-            setState(() {
-              mengeProAnteil = mpA;
-            });
-          },
-          icon: const Icon(Icons.widgets),
+        Expanded(
+          child: IconButtonField(
+            button: IconButton(
+              focusNode: focusNode,
+              onPressed: () async {
+                var mpA = 
+                  await MengeAnteil.anteilung(context, 
+                    widget.anteileController, 
+                    menge: menge
+                  );
+                setState(() {
+                  if (mpA != null) {
+                    mengeProAnteil = mpA;
+                  }
+                });
+                if (!context.mounted) {
+                  return;
+                }
+                FocusScope.of(context).requestFocus(focusNode);
+              },
+              icon: const Icon(Icons.widgets),
+            ),
+            label: MengeAnteil.proAnteil(mengeProAnteil),
+          ),
         ),
       ],
+    );
+  }
+}
+class IconButtonField extends StatelessWidget {
+  final IconButton button;
+  final String? label;
+  const IconButtonField({super.key, required this.button, this.label, });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.all(8.0),
+      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+      decoration: BoxDecoration(
+        border: Border.all(),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      width: MediaQuery.of(context).size.width,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(button.tooltip ?? label!),
+          button,
+        ],
+      )
     );
   }
 }

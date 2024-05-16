@@ -1,4 +1,5 @@
 import 'package:ernteliste/src/kw_feature/kw_model.dart';
+import 'package:ernteliste/src/misc.dart';
 import 'package:flutter/material.dart';
 import 'package:server/utils.dart';
 
@@ -11,23 +12,19 @@ import 'settings_service.dart';
 /// uses the SettingsService to store and retrieve user settings.
 class SettingsController with ChangeNotifier {
   SettingsController(this._settingsService);
-
   // Make SettingsService a private variable so it is not used directly.
   final SettingsService _settingsService;
-
   // Make ThemeMode a private variable so it is not updated directly without
   // also persisting the changes with the SettingsService.
   late ThemeMode _themeMode;
-
   // Allow Widgets to read the user's preferred DateTime.
   ThemeMode get themeMode => _themeMode;
-
   /// Load the user's settings from the SettingsService. It may load from a
   /// local database or the internet. The controller only knows it can load the
   /// settings from the service.
   Future<void> loadSettings() async {
     _themeMode = await _settingsService.themeMode();
-
+    MengeAnteil.anteile.value = await _settingsService.anteile();
     // Important! Inform listeners a change has occurred.
     notifyListeners();
   }
@@ -48,6 +45,10 @@ class SettingsController with ChangeNotifier {
     // Persist the changes to a local database or the internet using the
     // SettingService.
     await _settingsService.updateThemeMode(newThemeMode);
+  }
+  Future<void> updateAnteile(num newAnteile) async {
+    MengeAnteil.anteile.value = newAnteile;
+    await _settingsService.updateAnteile(newAnteile);
   }
   Future<void> updateYear(DateTime newYear) async {
     KwModel.refTime.value = refDay(newYear.year);

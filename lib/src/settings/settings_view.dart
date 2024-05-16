@@ -31,9 +31,11 @@ class _SettingsViewState extends State<SettingsView> {
       Provider.of<PersistenceProvider>(AppConstant.globalNavigatorKey.currentContext!);
   String table = tableUser;
   late FocusNode focusNode;
+  late TextEditingController controller;
   @override
   void initState() {
     focusNode = FocusNode();
+    controller = TextEditingController();
     if (Persistor.userName.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
         loginDialog(context);
@@ -44,6 +46,7 @@ class _SettingsViewState extends State<SettingsView> {
   @override
   void dispose() {
     focusNode.dispose();
+    controller.dispose();
     super.dispose();
   }
   // ignore: unused_field
@@ -109,8 +112,20 @@ class _SettingsViewState extends State<SettingsView> {
                   ],
                 ),
               ),
-              iconField(context, 
-                IconButton(
+              IconButtonField(
+                button: IconButton(
+                  icon: const Icon(Icons.widgets),
+                  tooltip: 'Anzahl der Anteile ',
+                  onPressed: () {
+                    controller.text = '${MengeAnteil.anteile.value}';
+                    MengeAnteil.anteilung(context, controller).then((value) {
+                      widget.controller.updateAnteile(num.parse(controller.text));
+                    });
+                  },
+                )
+              ),
+              IconButtonField(
+                button: IconButton(
                   icon: const Icon(Icons.login),
                   tooltip: 'Erneut anmelden',
                   onPressed: () async {
@@ -123,8 +138,8 @@ class _SettingsViewState extends State<SettingsView> {
               ),
               Visibility(
                 visible: persistenceProvider.userIsAdmin(),
-                child: iconField(context, 
-                  IconButton(
+                child: IconButtonField(
+                  button: IconButton(
                     icon: const Icon(Icons.table_chart),
                     tooltip: 'Tabellen bearbeiten',
                     onPressed: () {
@@ -163,25 +178,6 @@ class _SettingsViewState extends State<SettingsView> {
           ),
         ),
       ),
-    );
-  }
-
-  Container iconField(BuildContext context, IconButton button) {
-    return Container(
-      margin: const EdgeInsets.all(8.0),
-      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-      decoration: BoxDecoration(
-        border: Border.all(),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      width: MediaQuery.of(context).size.width,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(button.tooltip ?? ''),
-          button,
-        ],
-      )
     );
   }
 }

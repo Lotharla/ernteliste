@@ -100,12 +100,20 @@ void main() {
       expect(await settingsService.themeMode(), ThemeMode.system);
       await settingsService.updateThemeMode(ThemeMode.dark);
       expect(await settingsService.themeMode(), ThemeMode.dark);
+      expect(await settingsService.anteile(), 1);
+      await settingsService.updateAnteile(3);
+      expect(await settingsService.anteile(), 3);
       Persistor.userMap.forEach((key, user) {
-        if (key == 'usr') {
-          expect((jsonDecode(user.einstellungen) as Map).containsValue('dark'), true);
+        switch (key) {
+          case 'usr':
+            expect((jsonDecode(user.einstellungen) as Map).containsValue('dark'), true);
+            break;
+          case Persistor.sysName:
+            expect((jsonDecode(user.einstellungen) as Map)[columnAnteile], 3);
+            break;
         }
       });
-    });
+   });
     test('Setup', () async {
       for (var serverAvailable in [false, true]) {
         Persistor.serverAvailable = serverAvailable;

@@ -74,11 +74,9 @@ class PersistenceProvider extends ChangeNotifier {
     _propagateChange();
   }
   Future<void> persistenceCheck({String? kw, int? cnt}) async {
-    setLogging();
     isLoading = true;
-    await setDatabase();
-    for (String name in [tableKulturen, tableEinheiten, tableUser]) {
-      await setupTable(name);
+    if (Persistor.userMap.isEmpty) {
+      await Persistor.prepare();
     }
     if (cnt != null) {
       cnt -= (await Persistor.perform('count')) as int;

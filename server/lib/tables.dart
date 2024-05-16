@@ -1,6 +1,7 @@
 import 'package:intl/intl.dart';
 
 final mengeFormat = NumberFormat("##0.##", 'de_DE');
+final satzFormat = NumberFormat("#0", 'de_DE');
 
 const columnId = 'rowid';
 const tableUser = 'User';

@@ -21,24 +21,25 @@ class ErtragForm extends StatefulWidget {
   State<ErtragForm> createState() => _ErtragFormState();
 }
 
+FocusNode? focusNode;
+void setFocus() {
+  focusNode?.requestFocus();
+}
 class _ErtragFormState extends State<ErtragForm> {
   final persistenceProvider =
       Provider.of<PersistenceProvider>(AppConstant.globalNavigatorKey.currentContext!);
   final _formKey = GlobalKey<FormState>();
   Map<String,TextEditingController> controllers = {};
-  FocusNode? focusNode;
   late Map<String,Future<List>> lists;
 
   @override
   void initState() {
     super.initState();
-    // focusNode = FocusNode();
     for(String col in columns[tableErtrag]!) controllers[col] = TextEditingController();
     lists = persistenceProvider.multiFetch();
   }
   @override
   void dispose() {
-    // focusNode.dispose();
     for(String col in columns[tableErtrag]!) controllers[col]!.dispose();
     super.dispose();
   }
@@ -50,6 +51,26 @@ class _ErtragFormState extends State<ErtragForm> {
       return 'Neuer Ertrag in $kw';
     } else {
       return 'Ertrag in $kw bearbeiten';
+    }
+  }
+  void prepareForm(BuildContext context) {
+    args = (ModalRoute.of(context)!.settings.arguments ?? args) as Map;
+    for(String col in columns[tableErtrag]!) {
+      var val = '';
+      switch (col) {
+        case columnSatz:
+          val = satzFormat.format(args[col] ?? 1);
+          break;
+        case columnMenge:
+          val = mengeFormat.format(args[col] ?? 0);
+          break;
+        case columnAnteile:
+          val = mengeFormat.format(args[col] ?? MengeAnteil.anteile.value);
+          break;
+        default:
+          val = args[col] ?? '';
+      }
+      controllers[col]!.text = val;
     }
   }
   Future<void> finishForm(BuildContext context) async {
@@ -64,27 +85,27 @@ class _ErtragFormState extends State<ErtragForm> {
       }
       if (!ertragNew || confirmed) {
         for(String col in columns[tableErtrag]!) {
-          args[col] = [columnMenge, columnAnteile].contains(col)
-            ? mengeFormat.parse(controllers[col]!.text) 
-            : controllers[col]!.text;
+          final val = controllers[col]!.text;
+          switch (col) {
+            case columnSatz:
+              args[col] = satzFormat.parse(val);
+              break;
+            case columnMenge:
+            case columnAnteile:
+              args[col] = mengeFormat.parse(val);
+              break;
+            default:
+              args[col] = val;
+          }
         }
         await persistenceProvider.upsert(args);
       }
     }
   }
-  void setFocus() {
-    focusNode?.requestFocus();
-  }
   @override
   Widget build(BuildContext context) {
     if (args.isEmpty && widget.title == null) {
-      args = (ModalRoute.of(context)!.settings.arguments ?? args) as Map;
-      for(String col in columns[tableErtrag]!) {
-        var val = args[col] ?? (col == columnMenge ? 0 : (col == columnAnteile ? 1 : ''));
-        controllers[col]!.text = [columnMenge, columnAnteile].contains(col) 
-          ? mengeFormat.format(val) 
-          : val.toString();
-      }
+      prepareForm(context);
     }
     return Consumer<PersistenceProvider>(
       builder: (context, provider, _) {
@@ -283,8 +304,9 @@ class _CompleterState extends State<Completer> {
         FocusNode fieldFocusNode,
         VoidCallback onFieldSubmitted) 
       {
+        focusNode ??= fieldFocusNode;
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          fieldFocusNode.requestFocus();
+          setFocus();
         });
         return FormTextField(
           widget.name,
@@ -389,49 +411,6 @@ class _SelectableButtonState extends State<SelectableButton> {
       ),
       onPressed: widget.onPressed,
       child: widget.child,
-    );
-  }
-}
-class PopupDialogComposite extends StatelessWidget {
-  final String label;
-  final Widget Function(BuildContext) dialog;
-  final TextEditingController controller;
-  final String separator;
-  final FocusNode? focusNode;
-  final String? Function(String?)? validator;
-  const PopupDialogComposite({super.key, 
-    required this.label, required this.dialog, required this.controller,
-    this.separator = '',
-    this.focusNode, this.validator,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 15,
-        vertical: 15,
-      ),
-      decoration: BoxDecoration(
-        border: Border.all(),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      width: MediaQuery.of(context).size.width,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Text(
-            '{_selected.year}',
-          ),
-          GestureDetector(
-            onTap: () {
-              MengeAnteil.anteilung(context, controller, 10);
-            },
-            child: const Icon(
-              Icons.calendar_month,
-            ),
-          )
-        ],
-      ),
     );
   }
 }

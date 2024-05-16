@@ -165,12 +165,12 @@ class ErtragListView extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '$columnSatz ${ertrag.satz}',
+                '$columnSatz ${satzFormat.format(ertrag.satz)}',
                 style: const TextStyle(
                     fontSize: 16, color: Colors.black),
               ),
               Text(
-                '${mengeFormat.format(ertrag.menge)} ${ertrag.einheit}',
+                mengeProAnteilEinheit(ertrag),
                 style: const TextStyle(
                     fontSize: 16, color: Colors.black),
               ),
@@ -190,4 +190,6 @@ class ErtragListView extends StatelessWidget {
       ),
     );
   }
+  String mengeProAnteilEinheit(Ertrag e) => 
+    '${mengeFormat.format(e.menge)} (${MengeAnteil.proAnteil(e.menge / e.anteile)}) ${e.einheit}';
 }
