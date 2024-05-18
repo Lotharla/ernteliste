@@ -36,9 +36,9 @@
                 "DATABASE": "/tmp/test.db"
             },
             "program": "bin/server.dart",
-            // "args": [
-            //     "--help",
-            // ]
+            "args": [
+                "--launch",
+            ]
         }
     ]
 }

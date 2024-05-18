@@ -214,6 +214,7 @@ Map<String, List<int>> ertragMap(List<Map<String, dynamic>> records) {
   return kwIds;
 }
 
+String projectPath = '${Platform.environment['HOME']}/devel/solawi/ernteliste';
 String serverFilePath(String fileName) {
   String script = Platform.script.toFilePath();
   return join(dirname(script), fileName);
@@ -232,8 +233,9 @@ Future<dynamic> getConfig([String? configFilePath]) async {
     return config;
   }
 }
-String serverPath = '${Platform.environment['HOME']}/devel/solawi/ernteliste/server/bin/server.dart';
-Future<Process> runServer({final port = '8080', String? database = '/tmp/test.db'}) async {
+Future<Process> runServer(String? path, {String port = '8080', String? database = '/tmp/test.db'}) async {
+  var serverPath = path ?? join(projectPath, 'server/bin/server.dart');
+  // print('path of server: $serverPath');
   Process p = await Process.start(
     'dart', ['run', serverPath],
     environment: database == null ? {'PORT': port} : {'PORT': port, 'DATABASE': database},

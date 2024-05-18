@@ -226,12 +226,7 @@ class MengeAnteil extends StatefulWidget {
           onFieldSubmitted: (value) {
             num? mengeProAnteil;
             if (menge != null) {
-              try {
-                anteile.value = max(1, mengeFormat.parse(value));
-              } catch (e) {
-                anteile.value = 1;
-              }
-              mengeProAnteil = menge / anteile.value;
+              mengeProAnteil = menge / max(1, mengeFormat.parse(value));
             }
             Navigator.pop(context, mengeProAnteil);
           },

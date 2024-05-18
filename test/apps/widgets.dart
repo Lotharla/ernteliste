@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:calendar_date_picker2/calendar_date_picker2.dart';
 import 'package:ernteliste/apps/navigating.dart';
+import 'package:ernteliste/src/app.dart';
 import 'package:ernteliste/src/app_constant.dart';
 import 'package:ernteliste/src/ertrag_feature/ertrag_form.dart';
 import 'package:ernteliste/src/kw_feature/kw_model.dart';
@@ -230,6 +233,61 @@ class DatePicker extends StatelessWidget {
           //   },
           // ),
         ),
+      ),
+    );
+  }
+}
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key, required this.settingsController});
+  final SettingsController settingsController;
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+  var _visible = true;
+  late AnimationController animationController;
+  late Animation<double> animation;
+  startTime() async {
+    var duration = const Duration(seconds: 2);
+    return Timer(duration, navigation);
+  }
+  void navigation() {
+    Navigator.of(context).push(
+        MaterialPageRoute(builder: (context) => MyApp(settingsController: widget.settingsController)));
+  }
+  @override
+  void initState() {
+    super.initState();
+    animationController = AnimationController(
+      vsync: this, 
+      duration: const Duration(seconds: 1)
+    );
+    animation = CurvedAnimation(parent: animationController, curve: Curves.easeOut);
+    animation.addListener(() => setState(() {}));
+    animationController.forward();
+    setState(() {
+      _visible = !_visible;
+    });
+    startTime();
+  }
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Stack(
+        fit: StackFit.expand,
+        children: <Widget>[
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              Image.asset(
+                'assets/images/Logo_Solawi.png',
+                width: animation.value * 250,
+                height: animation.value * 250,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

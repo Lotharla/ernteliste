@@ -24,7 +24,8 @@ void main() {
   setUp(() async {
     // File(database).createSync(recursive: true);
     try {
-      p = await runServer(
+      final config = await getConfig();
+      p = await runServer(config['server'],
         port: port, 
         database: database,
       );
@@ -34,14 +35,8 @@ void main() {
   });
   tearDown(() => p?.kill());
 
-  test('Root', () async {
+  test('Database', () async {
     await checkDatabase();
-    bool ok = await dbService.isUser('dev', funk: 'admin');
-    expect(await checkWho('dev', funk: 'admin'), ok);
-    expect(await dbService.isUser('div', funk: 'admin'), false);
-    expect(await dbService.isUser('dev', funk: 'user'), false);
-    expect(await dbService.isUser('dev'), true);
-    expect(await checkWho('sys'), false);
   }, timeout: Timeout.factor(timeoutFactor));
   test('404 bye', () async {
     var response = await http.get(Uri.parse('$url/foobar'));
@@ -125,6 +120,12 @@ void main() {
       return false;
     });
     expect(results.length, 1);
+    bool ok = await dbService.isUser('dev', funk: 'admin');
+    expect(await checkWho('dev', funk: 'admin'), ok);
+    expect(await dbService.isUser('div', funk: 'admin'), false);
+    expect(await dbService.isUser('dev', funk: 'user'), false);
+    expect(await dbService.isUser('dev'), true);
+    expect(await checkWho('sys'), false);
   }, timeout: Timeout.factor(timeoutFactor));
   test('bemerkungen', () async {
     await dbService.serve('clear');

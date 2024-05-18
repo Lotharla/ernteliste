@@ -34,7 +34,8 @@ void main() {
   setUp(() async {
     WidgetsFlutterBinding.ensureInitialized();
     await checkServer(false);
-    p = await runServer();
+    final config = await loadConfig();
+    p = await runServer(config['server']);
     await checkServer(true);
   });
   tearDown(() {

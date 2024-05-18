@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:args/args.dart';
+import 'package:path/path.dart';
 
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart';
@@ -195,13 +196,17 @@ void main(List<String> args) async {
   parser.addOption('setup', help: 'fill [table] with predefined values that will be suggested in Ertrag form', 
     valueHelp: 'table',
     allowedHelp: {'einheiten': 'suggestions for Einheiten', 'kulturen': 'suggestions for Kulturen'});
+  parser.addFlag('launch', negatable: false, help: "launch 'Ernteliste' app");
   final results = parser.parse(args);
   if (results.wasParsed('help')) {
     await dbService.info();
     print(parser.usage);
     exit(0);
   }
-  if (results.wasParsed('clear') || results.wasParsed('fill') || results.wasParsed('setup')) {
+  if (results.wasParsed('clear') 
+    || results.wasParsed('fill') 
+    || results.wasParsed('setup')) 
+  {
     if (results.wasParsed('clear')) {
       await dbService.serve('clear');
     }
@@ -217,7 +222,7 @@ void main(List<String> args) async {
         table: table,
         json: data != null ? jsonEncode(data) : "",
       );
-   }
+    }
     exit(0);
   }
 
@@ -234,4 +239,13 @@ void main(List<String> args) async {
   final port = int.parse(Platform.environment['PORT'] ?? "${config['port']}");
   final server = await serve(handler, ip, port);
   print(serverListening(port: '${server.port}'));
+
+  if (results.wasParsed('launch')) {
+    var appProject = dirname(dirname(dirname(Platform.script.toFilePath())));
+    assert(await Directory(appProject).exists());
+    Directory.current = appProject;
+    print('starting $appProject');
+    var proc = await Process.start('flutter', ['run', '-d', 'chrome']);
+    await proc.stderr.transform(utf8.decoder).forEach(print);
+  }
 }

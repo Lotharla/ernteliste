@@ -1,4 +1,5 @@
 {
+    "server":"/home/lotharla/devel/solawi/ernteliste/server/bin/server.dart",
     "host":"localhost",
     "port":8080,
     "service":"ertrag",
