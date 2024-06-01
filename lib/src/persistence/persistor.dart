@@ -36,12 +36,15 @@ void message([String? msg]) {
     message(msg);
   }
 }
-Future<Map<String, dynamic>> loadConfig() async {
-  String data = await rootBundle.loadString("assets/config.json");
-  return jsonDecode(data);
+Map<String, dynamic> config = {};
+Future<void> loadConfig() async {
+  if (config.isEmpty) {
+    String data = await rootBundle.loadString("assets/config.json");
+    config = interpolate(data, {'appHome': appHomePath()});
+  }
 }
 Future<void> setDatabase() async {
-  final config = await loadConfig();
+  await loadConfig();
   if (config['database'] != null) {
     if (!kIsWeb && !flutterTest()) {
       dbService.databaseFile = config['database'];
@@ -102,7 +105,7 @@ String tablePath(String table, {String first = 'table'}) => '$first/$table';
 class Persistor {
   Persistor._();
   static Future<String> serviceUrl(String? path) async {
-    final config = await loadConfig();
+    await loadConfig();
     path = path ?? config['service'];
     return 'http://${config['host']}:${config['port']}/$path';
   }

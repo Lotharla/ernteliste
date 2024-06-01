@@ -129,7 +129,14 @@ class _SettingsViewState extends State<SettingsView> {
                   icon: const Icon(Icons.login),
                   tooltip: 'Erneut anmelden',
                   onPressed: () async {
-                    loginDialog(context);
+                    VoidCallback callback = () {};
+                    if (ModalRoute.of(context) != null) {
+                      Map args = ModalRoute.of(context)?.settings.arguments as Map;
+                      if (args.containsKey('callback')) {
+                        callback = args['callback']!;
+                      }
+                    }
+                    loginDialog(context, callback: callback);
                     setState(() {
                       _counter++;
                     });

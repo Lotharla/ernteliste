@@ -33,8 +33,8 @@ void main() {
   late Process p;
   setUp(() async {
     WidgetsFlutterBinding.ensureInitialized();
+    await loadConfig();
     await checkServer(false);
-    final config = await loadConfig();
     p = await runServer(config['server']);
     await checkServer(true);
   });
@@ -126,7 +126,7 @@ void main() {
             await setupTable(name);
           }
           count[name] = await Persistor.perform('count', path: tablePath(name));
-          expect(count[name], isPositive);
+          expect(count[name], isPositive, reason: 'table $name, serverAvailable $serverAvailable');
           if (!Persistor.serverAvailable) {
             expect(count[name], (await defaultRecords(name)).length);
           }

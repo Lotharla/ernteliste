@@ -6,6 +6,7 @@ import 'package:characters/characters.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:path/path.dart';
+import 'package:server/template_string.dart';
 import 'package:week_of_year/week_of_year.dart';
 import 'tables.dart';
 
@@ -214,27 +215,51 @@ Map<String, List<int>> ertragMap(List<Map<String, dynamic>> records) {
   return kwIds;
 }
 
-String projectPath = '${Platform.environment['HOME']}/devel/solawi/ernteliste';
-String serverFilePath(String fileName) {
-  String script = Platform.script.toFilePath();
-  return join(dirname(script), fileName);
+String appHomePath() {
+  const home = String.fromEnvironment('APP_HOME');
+  // print('APP_HOME $home');
+  if (home.isNotEmpty) {
+    return home;
+  } else {
+    String path = Platform.script.toFilePath();
+    if (extension(path) == '.dill') {
+      path = Directory.current.toString();
+      path = path.substring(1 + path.indexOf('\''), path.indexOf('ernteliste') + 10);
+      return path;
+    } else if (extension(path) == '.dart') {
+      return path.substring(0, path.indexOf('ernteliste') + 10);
+    } else {
+      return dirname(dirname(dirname(path)));
+    }
+  }
 }
-Future<dynamic> getConfig([String? configFilePath]) async {
-  configFilePath ??= serverFilePath('config.json');
+Map<String,dynamic> interpolate(String jsonData, Map<String,dynamic> params) {
+  Map<String,dynamic> data = jsonDecode(jsonData);
+  data.forEach((key, value) {
+    if (value is String) {
+      data[key] = TemplateString(value).format(params);
+    }
+  });
+  return data;
+}
+Future<dynamic> getConfig() async {
+  var path = appHomePath();
+  String configFilePath = join(path, 'assets/config.json');
   if (await File(configFilePath).exists()) {
-    return jsonDecode(await File(configFilePath).readAsString());
+    final params = <String, dynamic>{'appHome': path};
+    return interpolate(await File(configFilePath).readAsString(), params);
   } else {
     final config = {
       'host': 'localhost', 
       'port': 8080, 
       'service': 'ertrag', 
-      'database': serverFilePath('ernteliste.db')};
+      'database': join(path, 'data/ernteliste.db')};
     await File(configFilePath).writeAsString(jsonEncode(config));
     return config;
   }
 }
 Future<Process> runServer(String? path, {String port = '8080', String? database = '/tmp/test.db'}) async {
-  var serverPath = path ?? join(projectPath, 'server/bin/server.dart');
+  var serverPath = path ?? Platform.script.toFilePath();
   // print('path of server: $serverPath');
   Process p = await Process.start(
     'dart', ['run', serverPath],

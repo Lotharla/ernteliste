@@ -1,7 +1,7 @@
 {
-    "server":"/home/lotharla/devel/solawi/ernteliste/server/bin/server.dart",
+    "server":"{appHome}/server/bin/server.dart",
     "host":"localhost",
     "port":8080,
     "service":"ertrag",
-    "database":"/home/lotharla/devel/solawi/ernteliste/data/ernteliste.db"
+    "database":"{appHome}/data/ernteliste.db"
 }

@@ -38,6 +38,14 @@ class NavigatingApp extends StatelessWidget {
       child: ListenableBuilder(
         listenable: settingsController,
         builder: (BuildContext context, Widget? child) {
+          var routes = {
+              KwListView.routeName: (context) => const KwListView(),
+              KwErtragView.routeName: (context) => const KwErtragView(title: 'Kw'),
+              ErtragForm.routeName: (context) =>  const ErtragForm(),
+              TablesPage.routeName:(context) => const TablesPage(),
+              SettingsView.routeName: (context) =>  SettingsView(controller: settingsController),
+            };
+          const route = String.fromEnvironment('ROUTE');
           return MaterialApp(
             navigatorKey: NavigationService().navigatorKey,
             debugShowCheckedModeBanner: false,
@@ -46,14 +54,8 @@ class NavigatingApp extends StatelessWidget {
             //   colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
             //   useMaterial3: true,
             // ),
-            home: const NavigatingPage(),
-            routes: {
-              KwListView.routeName: (context) => const KwListView(),
-              KwErtragView.routeName: (context) => const KwErtragView(title: 'Kw'),
-              ErtragForm.routeName: (context) =>  const ErtragForm(),
-              TablesPage.routeName:(context) => const TablesPage(),
-              SettingsView.routeName: (context) =>  SettingsView(controller: settingsController),
-            },
+            routes: routes,
+            home: routes.containsKey(route) ? routes[route]!(context) : const NavigatingPage(),
           );
         },
       ),

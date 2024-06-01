@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import 'package:server/tables.dart';
 import 'package:ernteliste/src/persistence/persistence_provider.dart';
 
+
 class FormTextField extends StatelessWidget {
   final String label;
   final TextEditingController? controller;
@@ -75,17 +76,18 @@ class FormTextField extends StatelessWidget {
     }
   }
 }
-Future loginDialog(BuildContext context) {
+Future loginDialog(BuildContext context, {VoidCallback? callback}) {
   return showDialog(
     context: context,
     barrierDismissible: false,
     builder: (context) {
-      return const LoginDialog();
+      return LoginDialog(callback: callback);
     },
   );
 }
 class LoginDialog extends StatefulWidget {
-  const LoginDialog({super.key});
+  const LoginDialog({super.key, this.callback});
+  final VoidCallback? callback;
   @override
   State<LoginDialog> createState() => _LoginDialogState();
 }
@@ -132,6 +134,9 @@ class _LoginDialogState extends State<LoginDialog> {
                             onFieldSubmitted: (name) {
                               if (_formKey.currentState!.validate()) {
                                 persistenceProvider.setUser(name);
+                                if (widget.callback != null) {
+                                  widget.callback!();
+                                }
                                 message();
                                 Navigator.of(context).pop();
                               }

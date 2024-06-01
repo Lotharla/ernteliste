@@ -184,10 +184,6 @@ class DatabaseService extends DatabaseHelper {
             if (verbose) print("table '$table' dropped");
           }
           break;
-        case 'reset':
-          touch(reset: true);
-          res = ResponseModel('database', 'reset');
-          break;
         default:
           throw Exception('illegal operation');
       }

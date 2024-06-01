@@ -5,9 +5,31 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "type": "bashdb",
+            "request": "launch",
+            "name": "Bash-Debug (webapp.sh)",
+            "cwd": "${workspaceFolder}",
+            "program": "webapp.sh",
+            "args": [""]
+        },
+        {
+            "name": "tables",
+            "type": "dart",
+            "request": "launch",
+            "program": "lib/apps/navigating.dart",
+            "toolArgs": [
+                "--dart-define",
+                "ROUTE=/tables"
+            ]
+        },
+        {
             "name": "ernteliste",
             "request": "launch",
-            "type": "dart"
+            "type": "dart",
+            "toolArgs": [
+                "--dart-define",
+                "APP_HOME=${workspaceFolder}"
+            ]
         },
         {
             "name": "ernteliste (profile mode)",
@@ -37,7 +59,7 @@
             },
             "program": "bin/server.dart",
             "args": [
-                "--launch",
+                "--reset",
             ]
         }
     ]
