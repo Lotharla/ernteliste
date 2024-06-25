@@ -1,4 +1,5 @@
 #!/bin/bash
+export CHROME_EXECUTABLE=$(which chromium)
 DIR=$(realpath $(dirname "$0"))
 srv=(dart run "--define=APP_HOME=$(printf -v home %q "$DIR")" bin/server.dart)
 cd "$DIR/server"

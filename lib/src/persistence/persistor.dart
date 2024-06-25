@@ -26,7 +26,9 @@ void message([String? msg]) {
   if (msg != null) {
     BuildContext? context = AppConstant.globalScaffoldKey.currentContext;
     if (context != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      ScaffoldMessenger.of(context)
+        ..removeCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(msg)));
     } else {
       mess = msg;
     }

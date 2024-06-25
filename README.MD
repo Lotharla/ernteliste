@@ -1,16 +1,23 @@
-# ernteliste
+# Ernteliste
 
-A new Flutter project.
+A Flutter project for Solawi.
+
+## Prerequsites
+
+Installation of Flutter, Chrome and SQLite:
+    sudo apt install git sqlite3 libsqlite3-dev
+    sudo apt install -y chromium-browser
+    sudo snap install flutter --classic
+Look for possible problems:
+    flutter doctor -v
 
 ## Getting Started
 
-This project is a starting point for a Flutter application that follows the
-[simple app state management
-tutorial](https://flutter.dev/docs/development/data-and-backend/state-mgmt/simple).
-
-For help getting started with Flutter development, view the
-[online documentation](https://flutter.dev/docs), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Download and start the 'Ernteliste' app.
+    git clone https://github.com/Lotharla/ernteliste
+    cd ernteliste
+    ./starter.sh
+Follow the menus to launch the web application or just the server only.
 
 ## Assets
 
@@ -27,4 +34,4 @@ the `lib/src/localization` directory.
 
 To support additional languages, please visit the tutorial on
 [Internationalizing Flutter
-apps](https://flutter.dev/docs/development/accessibility-and-localization/intern
+apps](https://flutter.dev/docs/development/accessibility-and-localization/intern)
