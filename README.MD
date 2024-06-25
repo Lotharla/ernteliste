@@ -4,20 +4,20 @@ A Flutter project for Solawi.
 
 ## Prerequsites
 
-Installation of Flutter, Chrome and SQLite:
-    sudo apt install git sqlite3 libsqlite3-dev
-    sudo apt install -y chromium-browser
-    sudo snap install flutter --classic
-Look for possible problems:
-    flutter doctor -v
+Installation of Flutter, Chrome and SQLite:  
+    sudo apt install git sqlite3 libsqlite3-dev  
+    sudo apt install -y chromium-browser  
+    sudo snap install flutter --classic  
+Look for possible problems:  
+    flutter doctor -v  
 
 ## Getting Started
 
-Download and start the 'Ernteliste' app.
-    git clone https://github.com/Lotharla/ernteliste
-    cd ernteliste
-    ./starter.sh
-Follow the menus to launch the web application or just the server only.
+Download and start the 'Ernteliste' app.  
+    git clone https://github.com/Lotharla/ernteliste  
+    cd ernteliste  
+    ./starter.sh  
+Follow the menus to launch the web application or just the server only.  
 
 ## Assets
 
