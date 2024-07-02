@@ -81,7 +81,7 @@ class TableViewState extends State<TableView> with AutomaticKeepAliveClientMixin
             default:
               return ScrollableWidget(
                   child: DataTable(
-                    headingRowColor: MaterialStateProperty.all<Color>(Colors.grey),
+                    headingRowColor: WidgetStateProperty.all<Color>(Colors.grey),
                     headingTextStyle: const TextStyle(fontWeight: FontWeight.bold),
                     sortAscending: isAscending,
                     sortColumnIndex: sortColumnIndex,
